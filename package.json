@@ -30,6 +30,8 @@
     "./scss": "./src/square-root.scss",
     "./css": "./dist/square-root.css",
     "./scrollsnap.css": "./dist/scrollsnap.css",
+    "./src/*": "./src/*",
+    "./dist/*": "./dist/*",
     "./package.json": "./package.json"
   },
   "files": [
