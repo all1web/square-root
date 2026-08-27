@@ -117,6 +117,7 @@ behaviour as a public API.
 | `src/` | the framework — source of truth |
 | `dist/` | compiled CSS, checked in, must match `src/` |
 | `docs/DESIGN-RATIONALE.md` | **why every constant is what it is — read first** |
+| `docs/MEASURING.md` | the authoring workflow — artboard px ÷ 60 → classes, snapping, verification |
 | `docs/HOW-IT-WORKS.md` | the scaler in depth, worked ratio tables |
 | `docs/UTILITIES.md` | complete class reference |
 | `docs/INTEGRATION.md` | HTML / Vite / Laravel / Tailwind adoption |

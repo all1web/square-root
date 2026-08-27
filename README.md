@@ -269,6 +269,7 @@ The trailing `()` **invokes** `simulateScreen` immediately and assigns its retur
 
 ## Docs
 
+- **[docs/MEASURING.md](docs/MEASURING.md)** — the authoring workflow: design on the 360 × 720 artboard, measure in pixels, divide by 60, and turn the result into classes — with a conversion table, a worked example, and how to verify the result in a browser. **Start here if you are building a page.**
 - **[docs/DESIGN-RATIONALE.md](docs/DESIGN-RATIONALE.md)** — why every constant is the number it is: the research behind the 60px finger unit, why the canon is 360 × 720, and the device-bracket reasoning. **Read this before changing a value.**
 - **[docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md)** — the scaler in depth: probes, the solve loop, worked ratio tables, column tiling, the landscape canon swap
 - **[docs/UTILITIES.md](docs/UTILITIES.md)** — complete class reference, what each resolves to, and which classes are commented out in source
