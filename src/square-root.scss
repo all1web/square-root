@@ -1,0 +1,217 @@
+
+:root {
+    --macro-width:360;
+    --macro-height:720;
+
+    /* Avertage finger 45-52/thumb:72px */
+    --micro-width:60;
+    --micro-height:60;
+}
+//import 'flowbite';
+//2xs 0-320 watch
+//xs 320-640 phone-xs
+//sm 640-768
+//dm 768-1024 tablet
+//lg 1024-1280 laptop
+//xl 1280-1536 desktop
+//2xl 1536 and above
+@import "_scrollsnap";
+
+
+//1.6
+.sqr-macro-pixel { /* size of lense/ topfold of page minimum/Largest Unit that we want to fit in screen  from a mobile first approach*/
+    width: calc(var(--macro-width) * 1px);
+    height: calc(var(--macro-height) * 1px);
+}
+/* smallest unit that makes sense from a mobile first approach */
+.sqr-macro-rem {
+    width: calc(var(--macro-width) * 0.0625rem);//22.5
+    height: calc(var(--macro-height) * 0.0625rem);//45
+}
+
+
+/*https://www.smashingmagazine.com/2012/02/finger-friendly-design-ideal-mobile-touchscreen-target-sizes/#:~:text=Pixel%20Width%20of%20the%20Average,what%20most%20mobile%20guidelines%20suggest.*/
+
+.sqr-micro-pixel { /* size of lense/ topfold of page minimum/Largest Unit that we want to fit in screen  from a mobile first approach*/
+    width: calc(var(--micro-width) * 1px);
+    height: calc(var(--micro-height) * 1px);
+}
+.sqr-micro-rem {
+    width: calc(var(--micro-width) * 0.0625rem); //4.5rem
+    height: calc(var(--micro-height) * 0.0625rem); //4.5rem
+}
+.sqr-mr-1\/2 {
+    margin-right: calc(var(--micro-width) * 0.0625rem * 0.5);
+}
+.-sqr-ml-1\/2:first-child  {
+    margin-left: calc(var(--micro-width) * 0.0625rem * -0.5);
+}
+
+.sqr-t-1 {
+    top: calc(  ( var(--micro-width) * 1 *  0.0625rem) );
+}
+
+//sqr-w used for high number beyond page width to set width of pagewrapper
+.-sqr-h-screen-1 {
+    height: calc( 100vh - ( var(--micro-width) * 1 *  0.0625rem) );
+}
+.-sqr-h-screen-2 {
+    height: calc( 100vh - ( var(--micro-width) * 2 *  0.0625rem) );
+}
+.-sqr-h-screen-3 {
+    height: calc( 100vh - ( var(--micro-width) * 3  *  0.0625rem) );
+}
+.-sqr-h-screen-4 {
+    height: calc( 100vh - ( var(--micro-width) * 4  *  0.0625rem) );
+}
+.-sqr-h-screen-5 {
+    height: calc( 100vh - ( var(--micro-width) * 4  *  0.0625rem) );
+}
+.sqr-h-1\/2 {
+    height: calc(var(--micro-width) * 0.5 *  0.0625rem);
+}
+.sqr-pl-1-3\/4 {
+    padding-left: calc(var(--micro-width) * 1.75 *  0.0625rem);
+}
+@for $i from 1 through 8 {
+    .sqr-w-#{$i} {
+        width: calc(var(--micro-width) * #{$i} *  0.0625rem);
+    }
+    .sqr-h-#{$i} {
+        height: calc(var(--micro-width) * #{$i} *  0.0625rem);
+    }
+    .sqr-mt-#{$i} {
+        margin-top: calc(var(--micro-width) * #{$i} *  0.0625rem);
+    }
+    .sqr-mx-#{$i} {
+        margin-left: calc(var(--micro-width) * #{$i} *  0.0625rem);
+        margin-right: calc(var(--micro-width) * #{$i} *  0.0625rem);
+    }
+    .sqr-px-#{$i} {
+        padding-left: calc(var(--micro-width) * #{$i} *  0.0625rem);
+        padding-right: calc(var(--micro-width) * #{$i} *  0.0625rem);
+    }
+    .sqr-pt-#{$i} {
+        padding-top: calc(var(--micro-width) * #{$i} *  0.0625rem);
+    }
+    .sqr-pl-#{$i} {
+        padding-left: calc(var(--micro-width) * #{$i} *  0.0625rem);
+    }
+      /*
+
+    .sqr-my-#{$i} {
+        margin-bottom: calc(var(--micro-width) * #{$i} *  0.0625rem);
+        margin-top: calc(var(--micro-width) * #{$i} *  0.0625rem);
+    }
+    .sqr-py-#{$i} {
+        padding-bottom: calc(var(--micro-width) * #{$i} *  0.0625rem);
+        padding-top: calc(var(--micro-width) * #{$i} *  0.0625rem);
+    }
+    .sqr-pt-#{$i} {
+        padding-top: calc(var(--micro-width) * #{$i} *  0.0625rem);
+    }
+    .sqr-pb-#{$i} {
+        padding-bottom: calc(var(--micro-width) * #{$i} *  0.0625rem);
+    }
+    .sqr-l-#{$i} {
+        left: calc(var(--micro-width) * #{$i} *  0.0625rem);
+    }
+    .sqr-r-#{$i} {
+        left: calc(var(--micro-width) * #{$i} *  0.0625rem);
+    }
+    .sqr-ml-#{$i} {
+        margin-left: calc(var(--micro-width) * #{$i} *  0.0625rem);
+    }
+
+
+    .-sqr-ml-#{$i} {
+        margin-left: calc(var(--micro-width) * #{$i} *  -0.0625rem);
+    }
+    .-sqr-mr-#{$i} {
+        margin-right: calc(var(--micro-width) * #{$i} *  -0.0625rem);
+    }
+    */
+    .sqr-mr-#{$i} {
+        margin-right: calc(var(--micro-width) * #{$i} *  0.0625rem);
+    }
+
+    .-sqr-l-#{$i} {
+        left: calc(var(--micro-width) * #{$i} *  -0.0625rem);
+    }
+    .-sqr-r-#{$i} {
+        right: calc(var(--micro-width) * #{$i} *  -0.0625rem);
+    }
+
+}
+
+
+/*
+    dont want ladnscape media queryies on
+        -watches
+        -heights that are not the minium:not sure somewher ebetween 320-360
+        -width: our lowest device width res is 320 for a NOT WATCH, so it's height would be 640, do 620 to be safe, that height would now be width in landsscape
+        -was not working expected maybe meaning of width and height change? I did 320 both, is good actually, blessing in disquise once I tested on dev tools responsive view
+        */
+//320x292=moms apple watch
+
+//I dont think I need this anymore now I am just using tw media quries like md: etc to make the extra width show the card unfolding, seems like a better solution considering
+//I enabled again cause landscape header looked gigantic.
+
+//my design logix however as square root as a product should have this optional enabled for people/projects that I don't have a complicated score card unfolding wider and wider itself
+/*
+
+    this might have been the way to go buy I am experimenting between this landscape/portrait CSS logic
+    and the JS column per devicce width because when orientation changes the width I think is more important
+    than whether it is  portrait or landscape. But that is assuming devices will always have a good enough height in
+    landscape, however both methods scale things down anyway so I can experiment but leave this code always
+    here if not using it. It definitley has its up sides and great for most designs but maybe not square root.
+    I ended up using this for now. still figuring it out... saves me all the JS if width>height
+    bigger than watch...361 and below any tablet to not effect screens seems to work best
+*/
+@media screen and (orientation:landscape) and (min-width:361px) and (max-width:768px)  {
+    //1.6
+    .mobile-right-button { background:red; }
+    .sqr-macro-pixel { // size of lense/ topfold of page minimum/Largest Unit that we want to fit in screen  from a mobile first approach
+        width: calc(var(--macro-height) * 1px);
+        height: calc(var(--macro-width) * 1px);
+    }
+    // smallest unit that makes sense from a mobile first approach
+    .sqr-macro-rem {
+        width: calc(var(--macro-height) * 0.0625rem);//22.5
+        height: calc(var(--macro-width) * 0.0625rem);//45
+    }
+
+    .sqr-micro-pixel { // size of lense/ topfold of page minimum/Largest Unit that we want to fit in screen  from a mobile first approach
+        width: calc(var(--micro-height) * 1px);
+        height: calc(var(--micro-width) * 1px);
+    }
+    .sqr-micro-rem {
+        width: calc(var(--micro-height) * 0.0625rem); //4.5rem
+        height: calc(var(--micro-width) * 0.0625rem); //4.5rem
+    }
+
+}
+
+
+/*watch rules: 2xs*/
+@media(max-width:320px) {
+    .\32xs\:hide, .\32xs\:hidden {
+        display:none;
+    }
+    .\32xs\:block {
+        display:block;
+    }
+}
+@media(min-width:321px) {
+    .\xs\:sqr-my-1\/2 {
+        margin-top: calc(var(--micro-width) * 0.0625rem * 0.25);
+        margin-bottom: calc(var(--micro-width) * 0.0625rem * 0.25);
+    }
+    .\xs\:sqr-mx-1\/4 {
+        margin-left: calc(var(--micro-width) * 0.0625rem * 0.25);
+        margin-right: calc(var(--micro-width) * 0.0625rem * 0.25);
+    }
+}
+.text-2xs {
+    font-size: 0.65rem;
+}

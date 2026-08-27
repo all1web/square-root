@@ -1,0 +1,43 @@
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.invisible-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.invisible-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+.scrollsnap-horizontal {
+    scroll-snap-type: x mandatory;
+    //scroll-padding-left: calc(var(--micro-width) * 0.0625rem * 0.35);
+}
+
+.scrollsnap-horizontal .snap-x {
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+}
+
+.scrollsnap-vertical {
+    scroll-snap-type: y mandatory;//turns to proximity when going next auto so it can scroll up, cause it wont otherwise
+    overflow-y:scroll;
+    height:100vh;
+    scroll-padding-top: calc(var(--micro-width) * 0.0625rem * 0.225);
+}
+#layoutLiveWire.rows-1 .scrollsnap-vertical  {
+    scroll-padding-top: calc(var(--micro-width) * 0.0625rem * 0.225 * 4);
+}
+#layoutLiveWire.rows-2 .scrollsnap-vertical  {
+    scroll-padding-top: calc(var(--micro-width) * 0.0625rem * 0.225 * 13);
+}
+#layoutLiveWire.rows-3 .scrollsnap-vertical  {
+    scroll-padding-top: calc(var(--micro-width) * 0.0625rem * 0.225 * 14);
+}
+.scrollsnap-vertical > .snap-y {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    //height:100vh;
+
+}

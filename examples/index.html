@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- user-scalable=no matters here: Square Root already scales the design to the
+     device, so pinch-zoom would fight it. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, shrink-to-fit=no">
+<title>Square Root — live demo</title>
+
+<!-- 1. REQUIRED: the scaler writes the solved root font-size into this tag.
+        It must exist before square-root.js runs. -->
+<style id="square-root" type="text/css"></style>
+
+<!-- 2. The framework stylesheet -->
+<link rel="stylesheet" href="../dist/square-root.css">
+
+<style>
+    /* demo-only cosmetics — none of this is part of the framework */
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+           background: #0e0e14; color: #e8eaf2; }
+    .col      { background: #15151d; border-right: 1px solid #2a2a36; box-sizing: border-box; }
+    .card     { background: #1d1d28; border: 1px solid #313142; border-radius: .75rem;
+                padding: 1rem; box-sizing: border-box; }
+    .card h2  { margin: 0 0 .5rem; font-size: 1rem; }
+    .card p   { margin: 0; font-size: .8rem; color: #9aa0b5; line-height: 1.5; }
+    .tap      { display: flex; align-items: center; justify-content: center;
+                background: #2dd4bf; color: #06251f; border-radius: .5rem;
+                font-weight: 700; font-size: .8rem; }
+    .readout  { position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+                background: #06060a; border-bottom: 1px solid #2a2a36;
+                font: 600 12px/1.6 ui-monospace, Menlo, monospace; color: #2dd4bf;
+                padding: .5rem .75rem; }
+    .hint     { color: #6b7280; font-weight: 400; }
+</style>
+</head>
+<body>
+
+<!-- 3. REQUIRED: the two invisible probes. `.sqr-macro-rem` is the measuring
+        stick the scaler reads; keep both in the DOM and out of the way. -->
+<div class="fixed invisible sqr-macro-pixel" style="position:fixed;visibility:hidden;"></div>
+<div class="fixed invisible sqr-macro-rem"   style="position:fixed;visibility:hidden;"></div>
+
+<div class="readout" id="readout">measuring…</div>
+
+<!-- Horizontal snap: each column is one canonical screen wide.
+     Swipe left/right between columns; scroll within a column. -->
+<div id="pageWrapper" class="scrollsnap-horizontal invisible-scrollbar"
+     style="display:flex; overflow-x:auto; height:100vh;">
+
+    <section class="col snap-x scrollsnap-vertical invisible-scrollbar sqr-w-6"
+             style="flex:0 0 auto; overflow-y:auto; height:100vh; padding-top:2.5rem;">
+
+        <div class="snap-y" style="padding: .75rem;">
+            <div class="card sqr-h-4">
+                <h2>One design, every phone</h2>
+                <p>This column is <code>sqr-w-6</code> — six finger units, the full
+                   canonical width. Resize the window: the whole layout scales as
+                   one piece instead of re-flowing.</p>
+            </div>
+        </div>
+
+        <div class="snap-y" style="padding: .75rem;">
+            <div class="card sqr-h-5">
+                <h2>The finger unit</h2>
+                <p>Every size below is a multiple of 60px — the researched
+                   touch-target floor. Nothing built from these units can end up
+                   too small to tap.</p>
+                <div style="display:flex; gap:.5rem; margin-top:.75rem;">
+                    <div class="tap sqr-w-1 sqr-h-1">1</div>
+                    <div class="tap sqr-w-2 sqr-h-1">2</div>
+                    <div class="tap sqr-w-3 sqr-h-1">3</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="snap-y" style="padding: .75rem;">
+            <div class="card sqr-h-4">
+                <h2>Scroll snapping</h2>
+                <p>This column snaps vertically card by card. Swipe sideways for
+                   the next column — the sliver of it at the screen edge is the
+                   affordance, produced by the scale itself.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="col snap-x scrollsnap-vertical invisible-scrollbar sqr-w-6"
+             style="flex:0 0 auto; overflow-y:auto; height:100vh; padding-top:2.5rem;">
+        <div class="snap-y" style="padding: .75rem;">
+            <div class="card sqr-h-4">
+                <h2>Second column</h2>
+                <p>Identical construction. On a tablet or desktop the scaler fits
+                   a whole number of these columns side by side rather than
+                   stretching one.</p>
+            </div>
+        </div>
+        <div class="snap-y" style="padding: .75rem;">
+            <div class="card sqr-h-3">
+                <h2>Half units exist</h2>
+                <p>Fractions like <code>sqr-h-1/2</code> are for spacing — not for
+                   shrinking touch targets below the floor.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="col snap-x scrollsnap-vertical invisible-scrollbar sqr-w-6"
+             style="flex:0 0 auto; overflow-y:auto; height:100vh; padding-top:2.5rem;">
+        <div class="snap-y" style="padding: .75rem;">
+            <div class="card sqr-h-4">
+                <h2>Third column</h2>
+                <p>Rotate the device: between 361px and 768px in landscape the
+                   canon flips to 720 × 360 and the scaler re-solves.</p>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- 4. The scaler. It runs on load, on resize and on orientation change. -->
+<script type="module" src="../src/square-root.js"></script>
+
+<script>
+    // demo-only: show what the scaler decided
+    const readout = document.getElementById('readout');
+    function report() {
+        const probe = document.querySelector('.sqr-macro-rem');
+        const root  = getComputedStyle(document.documentElement).fontSize;
+        readout.innerHTML =
+            `viewport ${innerWidth}×${innerHeight}` +
+            ` &nbsp;|&nbsp; root ${root}` +
+            ` &nbsp;|&nbsp; canon spans ${Math.round(probe.getBoundingClientRect().width)}px` +
+            ` <span class="hint">(should equal viewport width)</span>`;
+    }
+    addEventListener('resize', () => setTimeout(report, 1200));
+    setTimeout(report, 1200);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,55 @@
+{
+  "name": "@all1web/square-root",
+  "version": "0.1.0",
+  "description": "A mobile-first layout framework that scales one canonical design (360×720, built on a researched 60px finger unit) to fit any phone exactly — same proportions on every screen size and aspect ratio, without breakpoints.",
+  "keywords": [
+    "css",
+    "scss",
+    "mobile-first",
+    "responsive",
+    "layout",
+    "scroll-snap",
+    "touch-targets",
+    "viewport-scaling",
+    "design-system"
+  ],
+  "homepage": "https://github.com/all1web/square-root#readme",
+  "bugs": {
+    "url": "https://github.com/all1web/square-root/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/all1web/square-root.git"
+  },
+  "license": "MIT",
+  "author": "Neo (ALL1WEB) <neo@all1web.com>",
+  "type": "module",
+  "main": "src/square-root.js",
+  "exports": {
+    ".": "./src/square-root.js",
+    "./scss": "./src/square-root.scss",
+    "./css": "./dist/square-root.css",
+    "./scrollsnap.css": "./dist/scrollsnap.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "dist",
+    "docs",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "sass src/square-root.scss dist/square-root.css --no-source-map",
+    "watch": "sass --watch src/square-root.scss dist/square-root.css --no-source-map"
+  },
+  "devDependencies": {
+    "sass": "^1.69.0"
+  },
+  "sideEffects": [
+    "*.css",
+    "*.scss",
+    "src/square-root.js"
+  ]
+}
