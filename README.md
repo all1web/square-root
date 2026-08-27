@@ -192,7 +192,7 @@ A landscape rule at `(orientation: landscape) and (min-width: 361px) and (max-wi
 
 `.scrollsnap-horizontal` sets `scroll-snap-type: x mandatory`; `.scrollsnap-vertical` sets `y mandatory` plus `overflow-y: scroll; height: 100vh`. Children marked `.snap-x` / `.snap-y` get `scroll-snap-align` and `scroll-snap-stop: always`. `.invisible-scrollbar` hides the scrollbar cross-browser. Vertical scroll-padding is expressed in fingers and has per-row overrides keyed off `#layoutLiveWire.rows-1` … `.rows-3`.
 
-Full detail, including the row overrides and the snap-stop behaviour: **[docs/scroll-snap.md](docs/scroll-snap.md)**.
+Full detail, including the row overrides and the snap-stop behaviour: **[docs/SCROLL-SNAP.md](docs/SCROLL-SNAP.md)**.
 
 ---
 
@@ -267,11 +267,11 @@ The trailing `()` **invokes** `simulateScreen` immediately and assigns its retur
 
 ## Docs
 
-- **[docs/design-rationale.md](docs/design-rationale.md)** — why every constant is the number it is: the research behind the 60px finger unit, why the canon is 360 × 720, and the device-bracket reasoning. **Read this before changing a value.**
-- **[docs/how-it-works.md](docs/how-it-works.md)** — the scaler in depth: probes, the solve loop, worked ratio tables, column tiling, the landscape canon swap
-- **[docs/utilities.md](docs/utilities.md)** — complete class reference, what each resolves to, and which classes are commented out in source
-- **[docs/integration.md](docs/integration.md)** — plain HTML, Vite, Laravel/Blade, and coexisting with Tailwind (including the rem-scaling caveat)
-- **[docs/scroll-snap.md](docs/scroll-snap.md)** — scroll-snap classes, row overrides, snap-stop behaviour
+- **[docs/DESIGN-RATIONALE.md](docs/DESIGN-RATIONALE.md)** — why every constant is the number it is: the research behind the 60px finger unit, why the canon is 360 × 720, and the device-bracket reasoning. **Read this before changing a value.**
+- **[docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md)** — the scaler in depth: probes, the solve loop, worked ratio tables, column tiling, the landscape canon swap
+- **[docs/UTILITIES.md](docs/UTILITIES.md)** — complete class reference, what each resolves to, and which classes are commented out in source
+- **[docs/INTEGRATION.md](docs/INTEGRATION.md)** — plain HTML, Vite, Laravel/Blade, and coexisting with Tailwind (including the rem-scaling caveat)
+- **[docs/SCROLL-SNAP.md](docs/SCROLL-SNAP.md)** — scroll-snap classes, row overrides, snap-stop behaviour
 - Runnable demo: [`examples/index.html`](examples/index.html)
 - Source of truth is small enough to read end to end: [`src/square-root.scss`](src/square-root.scss), [`src/_scrollsnap.scss`](src/_scrollsnap.scss), [`src/square-root.js`](src/square-root.js)
 

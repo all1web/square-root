@@ -132,6 +132,6 @@ into the scale itself rather than adding UI to explain the gesture.
 
 If you change a constant, change it knowing which of these it serves. Overriding
 `--macro-width` to target a different reference device is supported and
-documented in [integration.md](integration.md) — but a canon that is not a whole
+documented in [INTEGRATION.md](INTEGRATION.md) — but a canon that is not a whole
 multiple of the micro unit gives up point 3, and a micro unit below ~48 gives up
 point 1.

@@ -46,7 +46,7 @@ measures exactly 375px.
 ## The numbers are researched. Do not "tidy" them.
 
 This is the single most important thing to preserve. Every constant has a reason,
-documented in `docs/design-rationale.md`:
+documented in `docs/DESIGN-RATIONALE.md`:
 
 - **60 (the micro unit)** is the smallest block that is reliably tappable. Touch
   research puts an average fingertip at ~45–52px and a thumb at ~72px; 60 sits
@@ -116,9 +116,9 @@ behaviour as a public API.
 |---|---|
 | `src/` | the framework — source of truth |
 | `dist/` | compiled CSS, checked in, must match `src/` |
-| `docs/design-rationale.md` | **why every constant is what it is — read first** |
-| `docs/how-it-works.md` | the scaler in depth, worked ratio tables |
-| `docs/utilities.md` | complete class reference |
-| `docs/integration.md` | HTML / Vite / Laravel / Tailwind adoption |
-| `docs/scroll-snap.md` | the snap layer |
+| `docs/DESIGN-RATIONALE.md` | **why every constant is what it is — read first** |
+| `docs/HOW-IT-WORKS.md` | the scaler in depth, worked ratio tables |
+| `docs/UTILITIES.md` | complete class reference |
+| `docs/INTEGRATION.md` | HTML / Vite / Laravel / Tailwind adoption |
+| `docs/SCROLL-SNAP.md` | the snap layer |
 | `examples/index.html` | runnable demo with a live readout |
