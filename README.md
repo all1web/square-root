@@ -5,6 +5,8 @@
 A mobile-first CSS + JS layout framework — one design, scaled to fit every phone
 exactly, without breakpoints.
 
+![Square Root — solve every screen](https://github.com/all1web/plugin-assets/raw/main/square-root/hero.png)
+
 Phones do not agree on anything. A 320px Android, a 375px iPhone SE, a 430px Pro Max and a folded foldable all have different widths, different heights and different aspect ratios. So a screen you designed to look right on one of them looks cramped on the next and empty on the one after that. The usual answer is breakpoints: redraw the design two or three times and hope the in-between sizes behave. Square Root takes the other route. You design once, for one imaginary phone, and Square Root rescales that single design so it fits every real phone exactly — same proportions, same rhythm, same number of things above the fold. Nothing reflows, nothing jumps to a new breakpoint. The whole page just gets bigger or smaller as one piece.
 
 ---
