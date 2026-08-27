@@ -1,6 +1,9 @@
 # Square Root
 
-A mobile-first CSS + JS layout framework by [ALL1WEB](https://github.com/all1web).
+**Invented by [Neo Nosrati](https://neonos.net).**
+
+A mobile-first CSS + JS layout framework — one design, scaled to fit every phone
+exactly, without breakpoints.
 
 Phones do not agree on anything. A 320px Android, a 375px iPhone SE, a 430px Pro Max and a folded foldable all have different widths, different heights and different aspect ratios. So a screen you designed to look right on one of them looks cramped on the next and empty on the one after that. The usual answer is breakpoints: redraw the design two or three times and hope the in-between sizes behave. Square Root takes the other route. You design once, for one imaginary phone, and Square Root rescales that single design so it fits every real phone exactly — same proportions, same rhythm, same number of things above the fold. Nothing reflows, nothing jumps to a new breakpoint. The whole page just gets bigger or smaller as one piece.
 
@@ -276,9 +279,16 @@ Touch-target sizing follows [Smashing Magazine's finger-friendly design research
 
 ## License
 
-MIT.
+MIT — free to use, including commercially. Attribution is appreciated but not
+required.
 
 ## Author
 
-Neo ([N30](https://github.com/N30)) — [ALL1WEB](https://github.com/all1web).
+**Invented and built by Neo Nosrati** — [neonos.net](https://neonos.net) ·
+[@N30 on GitHub](https://github.com/N30).
+
+Square Root came out of building [ALL1.AI](https://all1.ai), where a single
+interface had to hold its shape across every phone a customer might arrive on.
+It has been running in production there since before this repository existed.
+
 Repository: <https://github.com/all1web/square-root>
