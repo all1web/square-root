@@ -1,6 +1,6 @@
 {
   "name": "@all1web/square-root",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A mobile-first layout framework that scales one canonical design (360×720, built on a researched 60px finger unit) to fit any phone exactly — same proportions on every screen size and aspect ratio, without breakpoints.",
   "keywords": [
     "css",

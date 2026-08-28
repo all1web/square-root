@@ -215,11 +215,9 @@ See §7.
 ```js
 let ratio = width/simulatedWidth;
 if(width < 1024 ) {
-    ratio = ratio/cols;
+    ratio = ratio/cols;          // applied exactly once (see §12)
     if(cols==1) {
         // ratio = ratio*0.89;   ← body commented out in source
-    } else {
-        ratio = ratio/cols;
     }
 } else {
     simulatedWidth = parseInt(width/simulatedWidth)*simulatedWidth;
@@ -283,7 +281,30 @@ Note the 320 case: the finger unit lands at 53.3 px, inside the 45–52 px "aver
 | `lg` | 768 – 1023 | **1.61** | tablet |
 | `xl` | 1024 and up | 1 (unused) | takes the desktop branch instead |
 
-`cols` is not a column count. It is a **deliberate shrink factor**: dividing the ratio makes the root font-size smaller, which makes the canonical device render narrower than the viewport, which means **more than one canonical column fits on screen**.
+`cols` **is** a column count — literally. Dividing the ratio by it makes the root font-size smaller, which makes the canonical device render narrower than the viewport, which means **`cols` canonical columns fit across the screen**. At `md` that is 1.2 columns: one full card plus a 20% sliver of the next. At `lg`, 1.61 columns.
+
+This is the invariant to preserve when touching this branch, and it is checkable — measure the probe and divide the viewport by it:
+
+| Viewport | Bucket | `cols` | Root px | Canon renders as | Columns on screen |
+|---|---|---|---|---|---|
+| 640 | `sm` | 1 | 28.444 | 640.0 px | 1.0000 |
+| 641 | `md` | 1.2 | 23.741 | 534.2 px | 1.2000 |
+| 767 | `md` | 1.2 | 28.407 | 639.2 px | 1.2000 |
+| 768 | `lg` | 1.61 | 21.201 | 477.0 px | 1.6100 |
+| 1023 | `lg` | 1.61 | 28.240 | 635.4 px | 1.6100 |
+| 1024 | `xl` | — | 22.756 | 512.0 px | 2.0000 |
+
+Two properties fall out of that table, and both are load-bearing:
+
+1. **The column count only ever increases with width** — 1 → 1.2 → 1.61 → 2. A wider screen never shows fewer, larger columns.
+2. **Each bucket's top lands on the same scale** — 28.444, 28.407, 28.240. The buckets tile: the design grows to ~28.4 px root, a column is added, it drops and grows again. That continuity is where the `cols` values come from, and it shows they are *derived*, not arbitrary:
+
+```
+767 / 640 = 1.198  ≈ 1.2    ← the md factor
+1023 / 640 = 1.598 ≈ 1.61   ← the lg factor (nudged to ≈ φ)
+```
+
+Each factor is its bucket's top width over the `sm` bucket's top width. Pick anything else and the seam at the bucket boundary opens up.
 
 That is the point. Square Root pairs with the horizontal snap utilities in `_scrollsnap.scss`:
 
@@ -486,11 +507,11 @@ Checklist when it does not work:
 
 ## 12. Known quirks
 
-These are real, they are in the shipped source, and they are documented here rather than quietly patched — one of them may well be intentional.
+These are real and they are in the shipped source. One of them is now fixed; the record is kept because the fix changes scale behaviour on `md` and `lg`, and consumers pinned to 0.1.x will see the old numbers.
 
-### Quirk 1 — `cols` is divided out twice
+### Quirk 1 — `cols` was divided out twice — **fixed in 0.2.0**
 
-`square-root.js` lines 88–100:
+Through 0.1.x, `square-root.js` read:
 
 ```js
 if(width < 1024 ) {
@@ -506,26 +527,38 @@ if(width < 1024 ) {
 }
 ```
 
-For any bucket where `cols !== 1` — that is `md` (1.2) and `lg` (1.61) — the ratio is divided by `cols` **twice**. The effective divisor is `cols²`:
+Because the `if(cols==1)` body is entirely commented out, every bucket where `cols !== 1` — `md` (1.2) and `lg` (1.61) — fell into the `else` and divided **again**. The effective divisor was `cols²`:
 
-| Bucket | `cols` | Intended divisor | Actual divisor |
+| Bucket | `cols` | Intended divisor | 0.1.x actual divisor |
 |---|---|---|---|
 | `md` | 1.2 | 1.2 | **1.44** |
 | `lg` | 1.61 | 1.61 | **2.5921** |
 
-Worked, at 800 px (an `lg` width, portrait so the probe reads 360):
+Earlier revisions of this document speculated that the factors might have been hand-tuned *with* the double division in place, and advised against deleting a line without re-tuning. Measurement settled it — the double division was a leftover, and three independent checks say so:
 
-```
-ratio = 800/360             = 2.2222
-ratio = 2.2222 / 1.61       = 1.3803     ← after division #1
-ratio = 1.3803 / 1.61       = 0.8573     ← after division #2
-root  = 85.73% = 13.72px  →  canon = 22.5rem = 308.6px
-800 / 308.6 = 2.59 canonical columns on screen
-```
+1. **The column count went backwards.** Squared, `lg` put **2.5921** canonical columns on a 1023 px screen while the `xl` branch puts **2.0** on a 1024 px one. One pixel wider, and the design got *bigger* — the opposite of what every other bucket does.
+2. **A tablet rendered smaller than a watch.** At 768 px the root solved to **13.168 px**, below the **14.222 px** a 320 px watch gets. Nothing in the design rationale asks for that.
+3. **The factors are derived for a single division.** `767/640 = 1.198 ≈ 1.2` and `1023/640 = 1.598 ≈ 1.61`. Each factor is its bucket's top width over the `sm` bucket's top width, which makes the buckets tile continuously at a ~28.4 px root (§7). That property exists only under one division; squaring destroys it. The factors were tuned *for* single division, not with the double in place.
 
-One division would have given ~1.61 columns — a peek. Two gives ~2.59 — two and a half full cards.
+The `else` branch was removed and the `if(cols==1)` block kept — it is the still-unimplemented phone peek (§7), unrelated to this fix. The `sm`/phone bucket and the `xl`/desktop branch are byte-for-byte unaffected; only `md` and `lg` move.
 
-The shape of the code is telling: the `if(cols==1)` branch was written to apply the phone peek (`× 0.89`), so the `else` was presumably meant to be the *only* shrink for `cols !== 1`, with the unconditional `ratio = ratio/cols` added later — or vice versa. **But `cols` values of 1.2 and 1.61 are themselves hand-tuned, not derived**, and 1.61 is suspiciously close to φ, so it is entirely possible the author tuned these numbers *with the double division in place* and the current output is exactly what was wanted. Do not "fix" it by deleting a line without re-tuning `cols` and looking at the result on a real tablet.
+Measured before and after, headless Edge, 812 px viewport height, dpr 1, portrait:
+
+| Viewport | Root px 0.1.x | Root px 0.2.0 |
+|---|---|---|
+| 320 | 14.222 | 14.222 |
+| 360 | 16.000 | 16.000 |
+| 640 | 28.444 | 28.444 |
+| 641 | 19.784 | **23.741** |
+| 700 | 21.605 | **25.926** |
+| 767 | 23.673 | **28.407** |
+| 768 | 13.168 | **21.201** |
+| 900 | 15.431 | **24.845** |
+| 1023 | 17.541 | **28.240** |
+| 1024 | 22.756 | 22.756 |
+| 1080 | 16.000 | 16.000 |
+
+If your design was authored against 0.1.x scale on a tablet, see the migration note in the CHANGELOG.
 
 ### Quirk 2 — `window.onload` never binds
 

@@ -70,21 +70,28 @@ documented in `docs/DESIGN-RATIONALE.md`:
 If you propose changing a constant, say which principle it serves and why the
 change is better. "Rounder number" is not a reason.
 
-## Two known quirks — documented on purpose, do not silently fix
+## Known quirks — documented on purpose, do not silently fix
 
 Both are in `src/square-root.js` and are described in the README and CHANGELOG:
 
-1. **Double `cols` division.** For screens where `cols !== 1`, the ratio is
-   divided by `cols` twice — once unconditionally, then again in the `else`
-   branch whose `if` body is fully commented out. This makes md/lg scale smaller
-   than a single division would. It may be deliberate tuning of the peek.
+1. ~~**Double `cols` division.**~~ **Fixed in 0.2.0.** For screens where
+   `cols !== 1` the ratio used to be divided by `cols` twice — once
+   unconditionally, then again in the `else` branch whose `if` body is fully
+   commented out. It was a leftover, not tuning of the peek: squared, `lg` put
+   2.59 columns on a 1023px screen while the desktop branch puts 2.0 on a
+   1024px one, so widening the screen scaled the design *up*; and the `cols`
+   values are `767/640 ≈ 1.2` and `1023/640 ≈ 1.61`, which only tile
+   continuously under a single division. `md`/`lg` now scale larger; `sm` and
+   `xl` are untouched. Migration note in the CHANGELOG.
 2. **`window.onload = simulateScreen();`** has parentheses, so it *invokes*
    immediately and assigns `undefined` to `onload` — the load handler never
    binds. Masked because `onresize` and the `orientationchange` listener fire.
+   **Still open** — left as-is.
 
-They are left as-is so existing projects depending on current scale behaviour are
-not surprised by an upgrade. **Fix only with Neo's explicit say-so**, and if you
-do, ship it as a minor version with a migration note in the CHANGELOG.
+Anything still on this list is left as-is so existing projects depending on
+current scale behaviour are not surprised by an upgrade. **Fix only with Neo's
+explicit say-so**, and if you do, ship it as a minor version with a migration
+note in the CHANGELOG.
 
 ## House rules for this repo
 

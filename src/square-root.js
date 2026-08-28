@@ -95,9 +95,16 @@ function simulateScreen() {
                 //This baiscally further resized the screen smaller so the tip of the right card shows so that
                 // user knows they can scroll to the right/left horizontally
              //   ratio = ratio*0.89;
-            }else {
-                ratio = ratio/cols;
             }
+            // NOTE (0.2.0): an `else { ratio = ratio/cols; }` used to sit here, so on md
+            // and lg the ratio was divided by `cols` twice and the effective divisor was
+            // cols² — 1.44 instead of 1.2, and 2.5921 instead of 1.61. That broke the
+            // invariant this whole branch exists to hold: `cols` is how many canonical
+            // columns land on screen. Squared, lg put 2.59 columns on a 1023px screen
+            // while the xl branch below puts 2 columns on a 1024px one, so the design got
+            // BIGGER as the screen got wider. `cols` is now applied exactly once.
+            // The if(cols==1) block above is kept: it is the still-unimplemented phone
+            // peek, not part of this fix. See CHANGELOG 0.2.0.
         }else {
             //simply make it smallest adjustments for perfect column fit.
             simulatedWidth=parseInt(width/simulatedWidth)*simulatedWidth;

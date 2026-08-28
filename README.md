@@ -210,7 +210,7 @@ The solve is not the same at every width. `square-root.js` sorts the viewport in
 | 768 – 1023 | `lg` | 1.61 |
 | 1024 and up | `xl` | 1 (desktop path) |
 
-**Below 1024 — the peek cue.** The ratio is divided by `cols`, which makes the solved root font-size *smaller* than a perfect one-column fit would give. The design therefore does not quite fill the width, and the next card in a horizontal scroller peeks in at the edge. That sliver is the affordance: it is how the user knows the row scrolls sideways, without a chevron or a hint label.
+**Below 1024 — the peek cue.** The ratio is divided by `cols` (exactly once, since 0.2.0), which makes the solved root font-size *smaller* than a perfect one-column fit would give. The design therefore does not quite fill the width, and the next card in a horizontal scroller peeks in at the edge. That sliver is the affordance: it is how the user knows the row scrolls sideways, without a chevron or a hint label. `cols` is literally the number of canonical columns that end up across the screen — 1.2 of them at `md`, 1.61 at `lg`.
 
 **1024 and up — whole columns.** The desktop branch does something different. It floors the number of canonical columns that fit and re-solves against that:
 
@@ -229,7 +229,9 @@ At 1200px with a 360px probe: `parseInt(3.33) = 3`, so it solves for `1200 / 108
 
 These are real, they are in the shipped source, and you should know about them before you go debugging your own layout.
 
-**1. `md` and `lg` are divided by `cols` twice.**
+**1. `md` and `lg` were divided by `cols` twice — fixed in 0.2.0.**
+
+Through 0.1.x the first division was unconditional, and then, because the `if (cols == 1)` branch body is commented out, any bucket where `cols !== 1` fell into the `else` and divided **again**:
 
 ```js
 if (width < 1024) {
@@ -238,14 +240,14 @@ if (width < 1024) {
     if (cols == 1) {
         // ratio = ratio * 0.89;   <-- body is commented out
     } else {
-        ratio = ratio / cols;
+        ratio = ratio / cols;      // <-- removed in 0.2.0
     }
 }
 ```
 
-The first division is unconditional. Then, because the `if (cols == 1)` branch body is commented out, any bucket where `cols !== 1` falls into the `else` and divides **again**. Effective divisors are therefore `1.2 × 1.2 = 1.44` at `md` and `1.61 × 1.61 = 2.5921` at `lg`, not 1.2 and 1.61. On an 800px tablet that is a solved root of ~85.7% rather than ~138%, i.e. roughly 2.6 canonical columns across instead of 1.6.
+Effective divisors were `1.2 × 1.2 = 1.44` at `md` and `1.61 × 1.61 = 2.5921` at `lg`. The tell that this was a leftover rather than tuning: at 1023px the squared `lg` factor put 2.59 columns on screen, while the desktop branch puts 2 columns on a 1024px screen — one pixel wider and the design got bigger. A 768px tablet also solved to a 13.17px root, smaller than the 14.22px a 320px watch gets.
 
-This may well be deliberate tuning — the doubled shrink is what produces the multi-card tablet layout in practice — but it is not what the code reads like. If you change `cols`, remember you are changing its square.
+Since 0.2.0 `cols` is applied once. `md` and `lg` therefore scale **larger** than they did on 0.1.x; phones (`sm`) and desktop (`xl`) are unchanged. See the CHANGELOG for the migration note and `docs/HOW-IT-WORKS.md` §12 for the full before/after table.
 
 **2. `window.onload = simulateScreen();` never binds a handler.**
 
