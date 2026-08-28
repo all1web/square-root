@@ -489,6 +489,13 @@ if(width < 1024 ) {
 }
 ```
 
+> **Both halves of this changed in 0.2.0** and the snippet above is 0.1.x. The `else` branch was
+> removed (`cols` is now divided out exactly once), and the `if(cols==1)` body is no longer
+> commented out — it is the opt-in phone peek switch, `ratio = ratio*sqrPeekFactor()`, which
+> returns exactly `1` unless `<html>` carries `sqr-peek`. **With peek on, `sqr-w-6` is ~89% of the
+> viewport rather than full-bleed**; see `HOW-IT-WORKS.md` §7.1 before relying on a full-width
+> utility.
+
 For `md` (`cols = 1.2`) and `lg` (`cols = 1.61`) the ratio is divided **twice** — effectively
 `/cols²` (1.44 and ≈2.59). The `if(cols==1)` branch's only statement
 (`ratio = ratio*0.89;`) is commented out, so at `cols == 1` the branch is a no-op and the

@@ -5,6 +5,97 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ## [0.2.0] — 2026-08-28
 
+### Added
+- **Phone peek, as a class switch.** The `if (cols == 1)` block in
+  `square-root.js` has carried a commented-out `ratio = ratio*0.89` and a note
+  asking for a way to disable it since the first release. It is now implemented
+  and switchable at runtime.
+
+  **Off by default.** Turn it on with a class on `<html>`:
+
+  ```html
+  <html class="sqr-peek">                        <!-- peek on, factor 0.89 -->
+  <html class="sqr-peek" data-sqr-peek="0.85">   <!-- peek on, factor 0.85 -->
+  <html>                                         <!-- peek off — 0.1.x behaviour -->
+  ```
+
+  Flip it live, with no reload — this is the "easy back and forth switch" it was
+  asked for. A `MutationObserver` on that one element re-solves when the class
+  or the attribute changes:
+
+  ```js
+  document.documentElement.classList.toggle('sqr-peek');   // from the console
+  document.documentElement.dataset.sqrPeek = '0.85';       // retune live
+  window.squareRootResolve();                              // force a re-solve
+  ```
+
+  `window.squareRootResolve()` is a new export — the same solve `onresize` runs,
+  except that a call arriving while a solve is in flight is retried after the
+  re-entrancy guard releases instead of being dropped.
+
+  **Scope.** The multiplication sits inside `if (cols == 1)`, so peek only ever
+  affects the phone bracket (≤ 640 px, which includes the sub-320 watch range —
+  it also has `cols == 1`). `md`, `lg` and `xl` never reach the line, and the
+  class is inert there.
+
+  **The factor.** Default `0.89`, Neo's original number. `data-sqr-peek` accepts
+  any finite number, clamped to `0.5 … 1.0`; anything unparseable falls back to
+  `0.89`. Factor `f` leaves roughly `1 − f` of the viewport showing the next
+  card — at 0.89 that is ~11%, about 40 px on a 360 px phone.
+
+### Changed — read this before turning peek on
+- **With `sqr-peek` on, the canonical width deliberately no longer equals the
+  viewport width.** This is the headline invariant of the framework, and the
+  feature breaks it on purpose. `sqr-w-6` stops being full-bleed: it renders at
+  ~89% of the screen, and every full-width element built on the canon inherits
+  that. If your design has a full-bleed hero, a background band or a sticky
+  footer that must touch both edges, peek will leave a gap beside it.
+
+  What still holds, unchanged:
+  - **Every ratio between units is preserved.** `sqr-w-3` is still half of
+    `sqr-w-6`; the finger unit is still one sixth of the canon. Peek multiplies
+    the one number every unit derives from, so it cannot move one utility
+    relative to another. (Exactly, in the computed values — rendered boxes
+    still carry the browser's usual 1/64 px layout rounding, as they do with
+    peek off.)
+  - **The design is uniformly scaled, not reflowed.** Peek moves one number —
+    the root font-size — so the whole composition shrinks as one piece. Nothing
+    re-wraps, nothing changes bucket, no breakpoint fires.
+  - **Nothing changes off the phone bracket**, and nothing changes at all with
+    the switch off.
+
+  Measured on `examples/index.html`, headless Edge, 812 px viewport height,
+  dpr 1, portrait. `sqr-w-6` is the six-finger canonical column:
+
+  | Viewport | Root px OFF | `sqr-w-6` OFF | Root px ON | `sqr-w-6` ON | Margin left showing |
+  |---|---|---|---|---|---|
+  | 360 | 16.0000 | 360.00 px | 14.2400 | 320.39 px | 39.61 px (11.00%) |
+  | 414 | 18.4000 | 414.00 px | 16.3760 | 368.45 px | 45.55 px (11.00%) |
+  | 640 | 28.4444 | 640.00 px | 25.3156 | 569.59 px | 70.41 px (11.00%) |
+  | 700 (`md`) | 25.9259 | 583.33 px | 25.9259 | 583.33 px | — class inert |
+  | 900 (`lg`) | 24.8447 | 559.00 px | 24.8447 | 559.00 px | — class inert |
+  | 1200 (`xl`) | 17.7778 | 400.00 px | 17.7778 | 400.00 px | — class inert |
+
+  The OFF column is byte-identical to the same measurement taken before this
+  change: `sqrPeekFactor()` returns exactly `1` when the class is absent, and
+  `x * 1` is exact in IEEE-754.
+
+- **Polarity is opt-in, not opt-out.** Neo's source note proposed the inverse —
+  peek always on, a `.full-screen` class to disable it. Opt-in was chosen
+  because this is a published package and opt-out would silently rescale every
+  design already built against it. To switch to the original polarity, change
+  the line marked `FLIP` in `sqrPeekFactor()`:
+
+  ```js
+  // opt-in (shipped):
+  if (!el || !el.classList.contains(SQR_PEEK_CLASS)) return 1;
+  // opt-out (Neo's original idea) — peek everywhere unless .full-screen says no:
+  if (!el || el.classList.contains('full-screen')) return 1;
+  ```
+
+  That one line is the whole polarity. (`data-sqr-peek` keeps working either
+  way, and the element stays `<html>`.)
+
 ### Fixed
 - **`cols` is now applied exactly once on `md` and `lg`.** The solver divided the
   ratio by `cols` twice — once unconditionally, then again in the `else` branch

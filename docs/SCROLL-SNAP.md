@@ -462,6 +462,12 @@ if(cols==1)
 }
 ```
 
+> **Both halves of this changed in 0.2.0** and the snippet above is 0.1.x. The `else` branch was
+> removed, so `cols` is divided out exactly once, and the `cols == 1` body is no longer commented
+> out — it now holds the opt-in phone peek switch (`HOW-IT-WORKS.md` §7.1), which multiplies by
+> exactly `1` unless `<html>` carries `sqr-peek`. **If you turn peek on, the peek cue this section
+> describes for tablets also appears on phones — and `sqr-w-6` stops being full-bleed there.**
+
 For `md` (`cols = 1.2`) and `lg` (`cols = 1.61`) the ratio is divided by `cols` **twice** — an
 effective `/1.44` and `/2.59`. The `if` branch that would have balanced this is commented out, so
 the `else` runs unguarded for every non-`1` bucket.

@@ -7,6 +7,12 @@ Square Root is a mobile-first layout framework by [ALL1WEB](https://github.com/a
 
 This document explains the mechanism, line by line, including the parts that are rough. If you only want the setup snippet, jump to [Required host-page setup](#required-host-page-setup).
 
+> **If you are turning on the phone peek switch (`sqr-peek`, new in 0.2.0), read
+> [§7.1](#71-the-phone-peek-switch-sqr-peek) first.** It is opt-in, and it
+> deliberately breaks the invariant the rest of this document builds up to: with
+> peek on, the canonical width is no longer the viewport width, and `sqr-w-6` is
+> no longer full-bleed.
+
 ---
 
 ## 1. Why breakpoints fail for this goal
@@ -215,9 +221,9 @@ See §7.
 ```js
 let ratio = width/simulatedWidth;
 if(width < 1024 ) {
-    ratio = ratio/cols;          // applied exactly once (see §12)
+    ratio = ratio/cols;               // applied exactly once (see §12)
     if(cols==1) {
-        // ratio = ratio*0.89;   ← body commented out in source
+        ratio = ratio*sqrPeekFactor();   // 1 unless <html> carries `sqr-peek` (§7.1)
     }
 } else {
     simulatedWidth = parseInt(width/simulatedWidth)*simulatedWidth;
@@ -225,7 +231,7 @@ if(width < 1024 ) {
 }
 ```
 
-The core is one line: **`ratio = viewportWidth / canonicalWidthAsRendered`**. On a phone with `cols === 1` that is the entire computation. The rest is the peek adjustment (§7) and the desktop column fit (§8).
+The core is one line: **`ratio = viewportWidth / canonicalWidthAsRendered`**. On a phone with the peek switch off — the default — that is the entire computation, because `sqrPeekFactor()` returns exactly `1` and `cols` is `1`. The rest is the peek adjustment (§7.1) and the desktop column fit (§8).
 
 ### Step 5 — write the answer
 
@@ -315,7 +321,15 @@ That is the point. Square Root pairs with the horizontal snap utilities in `_scr
 
 A card deck laid out this way is a row of canonical-width cards. If a card exactly fills the screen, the user sees a single full-bleed panel with **no affordance** — nothing on screen says "there is more to the side." Shrink the scale slightly and the edge of the next card intrudes at the viewport boundary. That sliver is the **peek cue**: the entire, unambiguous, zero-chrome signal that the deck scrolls horizontally.
 
-On phones (`cols === 1`) the peek is currently **not applied**. The intended mechanism is right there in the source, commented out:
+On phones (`cols === 1`) there is no `cols` division to produce that sliver — `cols` is 1, so the canon fills the width exactly and a full-screen card deck has no affordance at all. §7.1 is the switch that supplies one.
+
+---
+
+## 7.1 The phone peek switch (`sqr-peek`)
+
+*New in 0.2.0. **Off by default.***
+
+The mechanism was in the source from the first release, written and left disabled:
 
 ```js
 if(cols==1) //1 && width>320 && width< 1024 ) /* HERE PUT SOME LOGIC TO SIDABLE THIS, MAYBE BASED ON A CLASS ON <body> like: .full-screen */
@@ -326,7 +340,129 @@ if(cols==1) //1 && width>320 && width< 1024 ) /* HERE PUT SOME LOGIC TO SIDABLE 
 }
 ```
 
-`× 0.89` would render the canon at 89% of the viewport, leaving an 11% sliver. It is disabled because it needs an opt-out — the author's note proposes a `.full-screen` class on `<body>` — and no design that wants a genuinely full-bleed first panel should be forced into a peek. Re-enabling it is a one-line change, but you inherit the missing opt-out with it.
+`× 0.89` renders the canon at 89% of the viewport, leaving an 11% sliver — the same peek cue the `cols` factor produces on `md` and `lg`, but on the phone bracket where the horizontal card deck actually lives. It was disabled because it needed a way to turn it off: no design that wants a genuinely full-bleed first panel should be forced into a peek.
+
+### The switch
+
+That way is now a class, as the author's note asked for. It is on `<html>`:
+
+```html
+<html>                                         <!-- peek OFF (default) -->
+<html class="sqr-peek">                        <!-- peek ON, factor 0.89 -->
+<html class="sqr-peek" data-sqr-peek="0.85">   <!-- peek ON, factor 0.85 -->
+```
+
+```js
+function sqrPeekFactor() {
+    let el = document.documentElement;
+
+    if (!el || !el.classList.contains('sqr-peek')) return 1;
+
+    let raw = el.getAttribute('data-sqr-peek');
+    if (raw === null || raw === '') return 0.89;
+
+    let f = parseFloat(raw);
+    if (!isFinite(f)) return 0.89;              // garbage -> default
+    return Math.min(1, Math.max(0.5, f));       // out of range -> clamped
+}
+```
+
+| | |
+|---|---|
+| Element | `<html>` (`document.documentElement`) — always present, survives a body swap, and can be set in server-rendered markup so the very first solve already sees it |
+| Class | `sqr-peek` |
+| Attribute | `data-sqr-peek`, on the **same** element as the class |
+| Default factor | `0.89` |
+| Accepted range | `0.5 … 1.0`, clamped |
+| Fallback | `0.89` for anything non-finite, and for a missing or empty attribute |
+| Scope | inside `if (cols == 1)`, so the phone bracket only — ≤ 640 px, including the sub-320 watch range, which also has `cols == 1`. Inert on `md`, `lg` and `xl`. |
+
+Guard behaviour, measured at a 360 px viewport (root would be 16.000 px with peek off):
+
+| `data-sqr-peek` | Factor used | Root px | Why |
+|---|---|---|---|
+| *(absent)* | 0.89 | 14.240 | default |
+| `""` | 0.89 | 14.240 | empty is not a number |
+| `"0.85"` | 0.85 | 13.600 | in range |
+| `"0.5"` | 0.50 | 8.000 | the floor, used as-is |
+| `"0.2"` | 0.50 | 8.000 | clamped up to the floor |
+| `"3"` | 1.00 | 16.000 | clamped down to 1 — i.e. no peek |
+| `"banana"` | 0.89 | 14.240 | `parseFloat` gives `NaN` → default |
+
+### Choosing a factor
+
+Factor `f` leaves roughly `1 − f` of the viewport showing the next card:
+
+| Factor | Canon renders at | Sliver on a 360 px phone | Sliver on a 414 px phone |
+|---|---|---|---|
+| 0.95 | 95% | 18 px | 21 px |
+| **0.89** | **89%** | **~40 px** | **~46 px** |
+| 0.85 | 85% | 54 px | 62 px |
+| 0.80 | 80% | 72 px | 83 px |
+
+0.89 is the shipped default because ~40 px is about a finger-width of visible card edge — enough to read as "there is another card there" without stealing a meaningful amount of the current one. Below ~0.8 the sliver stops looking like a peek and starts looking like a layout mistake.
+
+### ⚠ The consequence: with peek ON, the canon is no longer the viewport
+
+**This is the invariant the rest of this document builds up to, and this feature breaks it on purpose.**
+
+Everything in §5 and §6 rests on `ratio = viewportWidth / canonicalWidthAsRendered`, which makes the canonical device span the viewport **exactly**. Multiply that ratio by 0.89 and it no longer does:
+
+| | Peek OFF | Peek ON (0.89) |
+|---|---|---|
+| Canon (`.sqr-macro-rem`, 22.5rem) on a 360 px phone | **360 px** — the full viewport | **320.4 px** — 89% of it |
+| `sqr-w-6` | full-bleed | ~89% of the screen |
+| A full-width hero, band or footer built on the canon | touches both edges | leaves ~40 px bare |
+
+**So: `sqr-w-6` is not full-bleed with peek on, and neither is anything else sized against the canon.** That is the entire point of the feature — the bare strip *is* the affordance — but if your design has a background band, an edge-to-edge image or a sticky footer that must touch both sides, peek will visibly break it. Reach for peek on a horizontally-scrolling card deck; leave it off on a single full-bleed page.
+
+**What still holds** — and this is why peek is a scale change rather than a layout change:
+
+1. **Every ratio between units is preserved.** `sqr-w-3` is still half of `sqr-w-6`; the finger unit is still one sixth of the canon; the 6 × 12 grid is still a 6 × 12 grid. Peek multiplies the single number every unit is derived from, so all of them move together — it cannot change one utility relative to another.
+
+   *Exactly, in the computed values.* Rendered boxes are a separate matter: browsers quantise layout to 1/64 px, so a **measured** ratio can land a hundredth of a pixel off ideal at some scales. Measured on Edge, `sqr-w-6 / sqr-w-3` with peek on came out 2.000000 at 375/390/430 px and 2.000098 at 360 px — a 0.015 px discrepancy on a 320 px box. That is browser layout rounding, it happens with peek off too at other viewport widths, and peek is not special in kind; it just lands on non-round root font-sizes more often.
+2. **The design is uniformly scaled, not reflowed.** Nothing re-wraps, no element changes its relationship to any other, no breakpoint fires, no bucket changes. It is the same composition, 11% smaller.
+3. **Tappability scales with it, so check the small end.** At 360 px with peek on, the finger unit renders at `60 × 0.89 = 53.4` px instead of 60. That is still inside the cited 45–52 px finger band (just above it), the same place the 320 px viewport lands with peek off (§6). At 320 px *with* peek on it is 47.5 px — still tappable, but that is the floor of the envelope. Below factor ~0.8 on a 320 px device you are designing under the research.
+4. **Off the phone bracket, and with the switch off, nothing changes at all.**
+
+### Flipping it live
+
+Peek is meant to be a back-and-forth switch, so a class change has to reach the solver without a reload. Two ways, both shipped:
+
+```js
+// 1. Just toggle the class. A MutationObserver on <html> re-solves by itself.
+document.documentElement.classList.toggle('sqr-peek');
+
+// 2. Retune without toggling — the observer watches the attribute too.
+document.documentElement.dataset.sqrPeek = '0.85';
+
+// 3. Force a solve yourself (after changing something the observer cannot see).
+window.squareRootResolve();
+```
+
+Paste any of those into the console on a live page and the layout re-scales in about a second — the solve is asynchronous (§5), so give it one.
+
+The observer is deliberately narrow: it is one `MutationObserver` on one element, filtered to `class` and `data-sqr-peek`, and it recomputes `sqrPeekFactor()` and **returns early if the value did not change**. Host apps write to `<html>`'s class list constantly — dark mode, scroll locks, framework hooks — and none of that should trigger a solve.
+
+`window.squareRootResolve()` is the public entry point and differs from calling `simulateScreen()` directly in one way: a solve holds the re-entrancy guard for ~1 s (§10), and a call landing inside that window would be silently dropped. `squareRootResolve()` re-schedules itself instead, so flipping the class twice in quick succession still converges on the correct final scale rather than getting stuck on the first one.
+
+### Why opt-in, when the source note said opt-out
+
+The author's note proposes the inverse polarity — peek on everywhere, a `.full-screen` class to disable it. Opt-in was shipped instead, for one reason: Square Root is a published package with at least one production consumer, and opt-out would silently rescale every phone layout already built against it on the next `npm update`. Off by default means an upgrade is a no-op.
+
+The polarity is one line. To switch to the original intent, in `sqrPeekFactor()`:
+
+```js
+// opt-in (shipped) — peek only where asked:
+if (!el || !el.classList.contains(SQR_PEEK_CLASS)) return 1;
+
+// opt-out (the source note's idea) — peek everywhere unless .full-screen says no:
+if (!el || el.classList.contains('full-screen')) return 1;
+```
+
+`data-sqr-peek`, the clamp, the observer and `squareRootResolve()` all work unchanged either way.
+
+---
 
 The `lg` factor carries a warning from the author:
 
@@ -438,11 +574,37 @@ screen.orientation.addEventListener("change", function(e) {
 });
 ```
 
-Three entry points, in practice two:
+Plus, since 0.2.0, the live re-solve path:
 
-1. **Immediate call at parse time** (line 120) — this is what runs on first paint.
+```js
+let sqrResolveRetry = null;
+function squareRootResolve() {
+    clearTimeout(sqrResolveRetry);
+    if (window.simuating) {
+        sqrResolveRetry = setTimeout(squareRootResolve, 1100);   // guard releases at ~1000ms
+        return;
+    }
+    simulateScreen();
+}
+window.squareRootResolve = squareRootResolve;
+
+let sqrLastPeek = sqrPeekFactor();
+new MutationObserver(function() {
+    let now = sqrPeekFactor();
+    if (now === sqrLastPeek) return;
+    sqrLastPeek = now;
+    squareRootResolve();
+}).observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-sqr-peek'] });
+```
+
+Four entry points, in practice three:
+
+1. **Immediate call at parse time** — this is what runs on first paint.
 2. **`window.onresize`** — every resize, including the resize a soft keyboard or a browser chrome collapse produces.
 3. **`screen.orientation` change** — resets to `100%` first (belt and braces; `simulateScreen()` does the same reset itself) and re-solves.
+4. **The peek observer / `window.squareRootResolve()`** — §7.1. The observer only fires when `sqrPeekFactor()` actually changes value, so unrelated writes to `<html>`'s class list cost one function call and nothing else.
+
+(The fourth entry point is the only one that routes through `squareRootResolve()` rather than calling `simulateScreen()` directly, and it is the only one that survives the guard: `onresize` and the orientation listener still drop events that land mid-solve, exactly as below.)
 
 The guard exists because a solve is asynchronous and stateful: it writes `100%`, waits, measures, writes a ratio. If a second solve started mid-flight it would measure a page that the first solve is about to change, and the ratio would be garbage. `window.simuating` (sic) makes the function a no-op while one is in progress.
 
@@ -461,6 +623,8 @@ Four things. All four are load-bearing except the pixel probe (§4), which you s
 
 ```html
 <!doctype html>
+<!-- Optional: add class="sqr-peek" here to turn on the phone peek (§7.1).
+     Off by default. Add data-sqr-peek="0.85" alongside it to retune. -->
 <html>
 <head>
     <!-- 1. The style tag the solver writes into. Must exist, must have this id, must be empty. -->
@@ -540,7 +704,7 @@ Earlier revisions of this document speculated that the factors might have been h
 2. **A tablet rendered smaller than a watch.** At 768 px the root solved to **13.168 px**, below the **14.222 px** a 320 px watch gets. Nothing in the design rationale asks for that.
 3. **The factors are derived for a single division.** `767/640 = 1.198 ≈ 1.2` and `1023/640 = 1.598 ≈ 1.61`. Each factor is its bucket's top width over the `sm` bucket's top width, which makes the buckets tile continuously at a ~28.4 px root (§7). That property exists only under one division; squaring destroys it. The factors were tuned *for* single division, not with the double in place.
 
-The `else` branch was removed and the `if(cols==1)` block kept — it is the still-unimplemented phone peek (§7), unrelated to this fix. The `sm`/phone bucket and the `xl`/desktop branch are byte-for-byte unaffected; only `md` and `lg` move.
+The `else` branch was removed and the `if(cols==1)` block kept — it is the phone peek, implemented separately in the same release (§7.1) and unrelated to this fix. The `sm`/phone bucket and the `xl`/desktop branch are byte-for-byte unaffected by *this* change; only `md` and `lg` move. (Peek can move `sm`, but only if you opt in by adding the class — with no class the phone bucket is byte-identical to 0.1.x.)
 
 Measured before and after, headless Edge, 812 px viewport height, dpr 1, portrait:
 

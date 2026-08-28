@@ -57,7 +57,7 @@ The probe measures 360px while the root is at 100% (16px). Two phones:
 
 Same fraction of the screen on both. That is the whole trick.
 
-> The buckets above 640px behave differently on purpose — see [Tablets and desktop](#behaviour-on-tablets-and-desktop).
+> The buckets above 640px behave differently on purpose — see [Tablets and desktop](#behaviour-on-tablets-and-desktop). And if you opt into the [phone peek switch](#the-phone-peek-switch-sqr-peek), the canon deliberately spans 89% of the viewport rather than all of it.
 
 ---
 
@@ -97,6 +97,7 @@ The JS is not optional and it is not standalone — it needs a style tag to writ
 
 ```html
 <!doctype html>
+<!-- add class="sqr-peek" to turn on the phone peek — off by default, see below -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -221,7 +222,60 @@ ratio = width / simulatedWidth;
 
 At 1200px with a 360px probe: `parseInt(3.33) = 3`, so it solves for `1200 / 1080 = 1.111` → root `111.1%`, and three 400px columns tile the viewport exactly. No ragged right edge, no half-column gutter. At 1440px it lands on 4 × 360 = 1440, ratio exactly 1.
 
-**Re-solving.** `simulateScreen()` runs once at parse time, again on `window.onresize`, and again on `screen.orientation` `change` (which resets the root to 100% first). A module-level `window.simuating` flag (spelling as in source) makes overlapping runs a no-op; it is cleared about a second after a solve begins, so resize events fired inside that window are dropped rather than queued.
+**Re-solving.** `simulateScreen()` runs once at parse time, again on `window.onresize`, and again on `screen.orientation` `change` (which resets the root to 100% first). A module-level `window.simuating` flag (spelling as in source) makes overlapping runs a no-op; it is cleared about a second after a solve begins, so resize events fired inside that window are dropped rather than queued. Since 0.2.0 there is a fourth trigger — `window.squareRootResolve()` and the peek observer below — which retries instead of being dropped.
+
+---
+
+## The phone peek switch (`sqr-peek`)
+
+*New in 0.2.0. **Off by default** — an upgrade changes nothing until you opt in.*
+
+Phones get `cols = 1`, so the canonical design fills the screen exactly and a horizontally-scrolling card deck shows no sign that it scrolls. `sqr-peek` shrinks the solve slightly so the edge of the next card stays visible — the same affordance the `cols` factor produces on tablets, on the bracket where card decks actually live.
+
+```html
+<html>                                         <!-- peek off (default) -->
+<html class="sqr-peek">                        <!-- peek on, factor 0.89 -->
+<html class="sqr-peek" data-sqr-peek="0.85">   <!-- peek on, factor 0.85 -->
+```
+
+The class goes on `<html>`. The factor is clamped to `0.5 … 1.0` and falls back to `0.89` on anything unparseable. Factor `f` leaves about `1 − f` of the viewport showing the next card — at the default 0.89 that is ~11%, roughly 40px on a 360px phone.
+
+**It only applies to phones.** The multiplication sits inside `if (cols == 1)`, so it affects widths up to 640px and nothing else. On `md`, `lg` and `xl` the class is inert.
+
+**Flip it live, no reload.** A `MutationObserver` on `<html>` (filtered to `class` and `data-sqr-peek`, and short-circuited when the resulting factor is unchanged) re-solves on its own:
+
+```js
+document.documentElement.classList.toggle('sqr-peek');   // paste into the console
+document.documentElement.dataset.sqrPeek = '0.85';       // retune live
+window.squareRootResolve();                              // or force a solve yourself
+```
+
+Give it about a second — the solve is asynchronous.
+
+### ⚠ What peek costs you
+
+**With peek on, the canonical width is no longer the viewport width.** That is the headline invariant of the framework, and this feature breaks it deliberately. `sqr-w-6` stops being full-bleed — it renders at ~89% of the screen — and so does every full-width element built on the canon. A background band, an edge-to-edge image or a sticky footer will leave a bare strip on one side. That strip is the feature; it is also the thing that will surprise you.
+
+| Viewport | root, peek off | `sqr-w-6`, peek off | root, peek on | `sqr-w-6`, peek on |
+|---|---|---|---|---|
+| 360 | 16.000px | 360.00px | 14.240px | 320.39px |
+| 414 | 18.400px | 414.00px | 16.376px | 368.45px |
+| 640 | 28.444px | 640.00px | 25.316px | 569.59px |
+
+**What still holds:** every ratio between units is preserved — `sqr-w-3` is still half of `sqr-w-6`, the finger unit is still one sixth of the canon — and the design is uniformly scaled, not reflowed. Nothing re-wraps and no breakpoint fires; the same composition is simply 11% smaller. Watch the small end though: at 360px with peek on the finger unit measures 53.4px, and at 320px it measures 47.5px — still inside the cited 45–52px touch band, but that is the floor.
+
+Use peek on a card deck. Leave it off on a full-bleed page.
+
+**Polarity.** The source note that this implements proposed the opposite default — peek always on, a `.full-screen` class to disable it. Opt-in was shipped because this is a published package and opt-out would silently rescale existing designs. Switching is one line in `sqrPeekFactor()`:
+
+```js
+// opt-in (shipped):
+if (!el || !el.classList.contains(SQR_PEEK_CLASS)) return 1;
+// opt-out (peek everywhere unless .full-screen says no):
+if (!el || el.classList.contains('full-screen')) return 1;
+```
+
+Full detail, including the guard table and the tappability note: **[docs/HOW-IT-WORKS.md §7.1](docs/HOW-IT-WORKS.md)**.
 
 ---
 
@@ -248,6 +302,8 @@ if (width < 1024) {
 Effective divisors were `1.2 × 1.2 = 1.44` at `md` and `1.61 × 1.61 = 2.5921` at `lg`. The tell that this was a leftover rather than tuning: at 1023px the squared `lg` factor put 2.59 columns on screen, while the desktop branch puts 2 columns on a 1024px screen — one pixel wider and the design got bigger. A 768px tablet also solved to a 13.17px root, smaller than the 14.22px a 320px watch gets.
 
 Since 0.2.0 `cols` is applied once. `md` and `lg` therefore scale **larger** than they did on 0.1.x; phones (`sm`) and desktop (`xl`) are unchanged. See the CHANGELOG for the migration note and `docs/HOW-IT-WORKS.md` §12 for the full before/after table.
+
+(The `cols == 1` body is no longer empty either — since 0.2.0 it holds the [peek switch](#the-phone-peek-switch-sqr-peek). That is a separate, opt-in feature; with no `sqr-peek` class it multiplies by exactly 1 and the phone bucket is byte-identical to 0.1.x.)
 
 **2. `window.onload = simulateScreen();` never binds a handler.**
 

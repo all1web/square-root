@@ -66,6 +66,10 @@ documented in `docs/DESIGN-RATIONALE.md`:
   scale so the *next column peeks in* at the screen edge. That sliver is the
   affordance for horizontal scrolling — built into the geometry instead of added
   as UI chrome.
+- **0.89 (the phone peek factor)** is Neo's number, from the comment that asked
+  for the feature. It is the same affordance as the `cols` sliver, applied where
+  `cols == 1` and there is no sliver to inherit: it leaves ~11% of the viewport
+  (~40px on a 360px phone) showing the next card. It is **opt-in** — see below.
 
 If you propose changing a constant, say which principle it serves and why the
 change is better. "Rounder number" is not a reason.
@@ -92,6 +96,35 @@ Anything still on this list is left as-is so existing projects depending on
 current scale behaviour are not surprised by an upgrade. **Fix only with Neo's
 explicit say-so**, and if you do, ship it as a minor version with a migration
 note in the CHANGELOG.
+
+## The phone peek switch — and the invariant it breaks
+
+Added in 0.2.0. The `if (cols == 1)` block used to be described here as the
+"unimplemented phone peek"; it is implemented now, as `sqrPeekFactor()`.
+
+- **Opt-in**, via `class="sqr-peek"` on `<html>`, tunable with
+  `data-sqr-peek="0.85"` on the same element (finite, clamped 0.5–1.0, falls
+  back to 0.89). Off by default because this is a published package and an
+  opt-out default would silently rescale every existing consumer. Neo's source
+  note proposed the opposite polarity (`.full-screen` as a disable flag); the
+  swap is one line, marked `FLIP` in the source and documented in the CHANGELOG.
+- **Scoped to `cols == 1`** — the phone bracket, ≤ 640. Inert on md/lg/xl.
+- **Live-togglable.** `window.squareRootResolve()` is exported, and a
+  `MutationObserver` on `<html>` re-solves when the class or attribute changes.
+  The observer compares the resulting factor first, so unrelated class writes on
+  `<html>` (dark mode, scroll locks, Livewire) do not trigger a solve.
+- **It breaks the headline invariant on purpose, and every doc must say so.**
+  With peek on, the canonical width is no longer the viewport width: `sqr-w-6`
+  is ~89% of the screen, not full-bleed, and every full-width element inherits
+  that. What survives is that all unit *ratios* are preserved and the design is
+  uniformly scaled rather than reflowed. If you touch this feature, keep that
+  caveat prominent — burying it would be exactly the kind of sloppy
+  documentation the house rules above exist to prevent.
+
+`sqrPeekFactor()` returns exactly `1` when the switch is off, and `x * 1` is
+exact in IEEE-754, so the default path is byte-identical to pre-0.2.0 behaviour.
+That property is load-bearing — do not "simplify" the multiply into something
+that rounds.
 
 ## House rules for this repo
 

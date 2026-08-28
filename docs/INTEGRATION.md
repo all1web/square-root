@@ -551,6 +551,8 @@ if (width < 1024) {
 }
 ```
 
+> **Both halves of this changed in 0.2.0** and this section describes 0.1.x. The `else` branch was removed, so `cols` is now divided out exactly once (see the CHANGELOG and `HOW-IT-WORKS.md` §12), and the `cols == 1` body is no longer commented out — it is now the opt-in phone peek switch, `ratio = ratio*sqrPeekFactor()`, which returns exactly `1` unless `<html>` carries `sqr-peek` (`HOW-IT-WORKS.md` §7.1).
+
 The unconditional `ratio = ratio/cols` runs, and then, whenever `cols !== 1`, the `else` branch divides by `cols` **again**. The `if` branch that would have handled `cols === 1` has its only statement commented out, so the `if`/`else` exists purely to add a second division for the non-1 buckets.
 
 `cols` is `1.2` at `md` (641–767px) and `1.61` at `lg` (768–1023px); it is `1` everywhere else, so phones and desktop are unaffected.

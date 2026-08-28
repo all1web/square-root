@@ -10,6 +10,54 @@
 window.simuating = false;
 
 
+// ---------------------------------------------------------------------------
+// PHONE PEEK — the switch Neo asked for in the cols==1 branch below.
+//
+// His note there reads: "HERE PUT SOME LOGIC TO SIDABLE THIS, MAYBE BASED ON A
+// CLASS ON <body> like: .full-screen". This is that class switch, with one
+// deliberate change: the polarity is inverted, so peek is opt-IN.
+// `.full-screen` would have been a disable flag, i.e. peek ON for everybody —
+// and this is a published package, so that would silently rescale every design
+// already built against 0.1.x/0.2.0. Off by default; nobody is surprised.
+//
+//   <html>                                          peek OFF  (default)
+//   <html class="sqr-peek">                         peek ON   at 0.89
+//   <html class="sqr-peek" data-sqr-peek="0.85">    peek ON   at 0.85
+//
+// The class goes on <html> (not <body>): it is always present, it survives a
+// body swap, and it can be set in the server-rendered markup so the very first
+// solve already has it.
+//
+// TO FLIP TO NEO'S ORIGINAL POLARITY (peek always on, `.full-screen` opts out)
+// swap the one line marked FLIP in sqrPeekFactor().
+const SQR_PEEK_CLASS   = 'sqr-peek';        // the switch
+const SQR_PEEK_ATTR    = 'data-sqr-peek';   // the amount, on the same element
+const SQR_PEEK_DEFAULT = 0.89;              // Neo's number: leaves ~11% showing
+const SQR_PEEK_MIN     = 0.5;               // never shrink the canon past half the screen
+const SQR_PEEK_MAX     = 1;                 // 1 = no peek at all
+
+function sqrPeekElement() {
+    return document.documentElement;
+}
+
+// Returns the multiplier to apply to the solved ratio: exactly 1 when the
+// switch is off, otherwise the (guarded) peek factor.
+function sqrPeekFactor() {
+    let el = sqrPeekElement();
+
+    // FLIP: for Neo's original polarity, replace this line with
+    //       if (!el || el.classList.contains('full-screen')) return 1;
+    if (!el || !el.classList.contains(SQR_PEEK_CLASS)) return 1;
+
+    let raw = el.getAttribute(SQR_PEEK_ATTR);
+    if (raw === null || raw === '') return SQR_PEEK_DEFAULT;
+
+    let f = parseFloat(raw);
+    if (!isFinite(f)) return SQR_PEEK_DEFAULT;                    // garbage -> default
+    return Math.min(SQR_PEEK_MAX, Math.max(SQR_PEEK_MIN, f));     // out of range -> clamped
+}
+
+
 function simulateScreen() {
 
 
@@ -95,6 +143,16 @@ function simulateScreen() {
                 //This baiscally further resized the screen smaller so the tip of the right card shows so that
                 // user knows they can scroll to the right/left horizontally
              //   ratio = ratio*0.89;
+
+                // 0.2.0: the above, made switchable. sqrPeekFactor() returns
+                // the 0.89 (or the data-sqr-peek override) only when <html>
+                // carries `sqr-peek`, and otherwise returns exactly 1 —
+                // and `x * 1` is exact in IEEE-754, so with the switch off this
+                // line cannot change a single digit of the old result.
+                // Scope note: this is inside if(cols==1), so peek only ever
+                // touches the phone bracket (<=640, including the sub-320 watch
+                // range, which also has cols==1). md/lg/xl never reach it.
+                ratio = ratio*sqrPeekFactor();
             }
             // NOTE (0.2.0): an `else { ratio = ratio/cols; }` used to sit here, so on md
             // and lg the ratio was divided by `cols` twice and the effective divisor was
@@ -103,8 +161,8 @@ function simulateScreen() {
             // columns land on screen. Squared, lg put 2.59 columns on a 1023px screen
             // while the xl branch below puts 2 columns on a 1024px one, so the design got
             // BIGGER as the screen got wider. `cols` is now applied exactly once.
-            // The if(cols==1) block above is kept: it is the still-unimplemented phone
-            // peek, not part of this fix. See CHANGELOG 0.2.0.
+            // The if(cols==1) block above is kept: it is the phone peek, which is a
+            // separate feature (also 0.2.0) and not part of this fix. See CHANGELOG 0.2.0.
         }else {
             //simply make it smallest adjustments for perfect column fit.
             simulatedWidth=parseInt(width/simulatedWidth)*simulatedWidth;
@@ -135,4 +193,38 @@ screen.orientation.addEventListener("change", function(e) {
     simulateScreen();
 
 });
+
+
+// ---------------------------------------------------------------------------
+// LIVE RE-SOLVE — what makes the peek an actual back-and-forth switch.
+//
+// window.squareRootResolve() is the public entry point: the same solve resize
+// runs, plus one piece of bookkeeping. A solve is asynchronous and holds the
+// re-entrancy guard for ~1s, so a call landing mid-solve would be silently
+// dropped by `if(window.simuating) return null;`. Here it is retried once the
+// guard releases instead, which is what lets you flip the class twice in quick
+// succession and still land on the right scale.
+let sqrResolveRetry = null;
+function squareRootResolve() {
+    clearTimeout(sqrResolveRetry);
+    if (window.simuating) {
+        sqrResolveRetry = setTimeout(squareRootResolve, 1100);   // guard releases at ~1000ms
+        return;
+    }
+    simulateScreen();
+}
+window.squareRootResolve = squareRootResolve;
+
+// Toggling the class should be enough on its own — nobody should have to
+// remember to call a function. One observer, on one element, filtered to the
+// two attributes that matter, and it compares the resulting factor before
+// re-solving so that unrelated class writes on <html> (dark mode, scroll locks,
+// Livewire, whatever the host app does) do not trigger a gratuitous solve.
+let sqrLastPeek = sqrPeekFactor();
+new MutationObserver(function() {
+    let now = sqrPeekFactor();
+    if (now === sqrLastPeek) return;
+    sqrLastPeek = now;
+    squareRootResolve();
+}).observe(sqrPeekElement(), { attributes: true, attributeFilter: ['class', SQR_PEEK_ATTR] });
 
