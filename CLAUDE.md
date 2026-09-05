@@ -3,6 +3,11 @@
 Read this before changing anything. It carries the context that is not obvious
 from the code, and the reasoning that must survive future edits.
 
+Square Root is a member of the LuCipher family: `GitHub/n30/lu_core/docs/` holds
+the seven laws and fractal design (this framework is the Layout rung of
+`02-fractal-design.md` — one canonical device, one finger unit, everything else a
+ratio), and `lu_core/CLAUDE.md` carries the family's standing rules.
+
 ## What this is
 
 Square Root is a mobile-first layout framework **invented by Neo Nosrati
