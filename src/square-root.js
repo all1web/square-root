@@ -30,6 +30,40 @@ window.simuating = false;
 //
 // TO FLIP TO NEO'S ORIGINAL POLARITY (peek always on, `.full-screen` opts out)
 // swap the one line marked FLIP in sqrPeekFactor().
+// ---------------------------------------------------------------------------
+// COLUMN CEILING — how many canonical columns a screen may show (0.3.0).
+//
+// Neo, 2026-09-08: "my Z Fold shows 3 columns instead of 2 in the big screen,
+// both landscape and portrait" (708x823 CSS). Two faults produced it. The
+// >=1024 branch fitted as many WHOLE columns as the width allowed, so a
+// 1104-wide window got three; and the md/lg bands asked for fractional counts
+// (1.2, 1.61) that were never meant as "how many columns", so a big phone
+// landed between one and two.
+//
+// The rule now: once a screen can give each column at least a phone's width,
+// the count is the ROUNDED number of canonical columns, capped by the ceiling
+// the page declares. A touch template caps at 2; a desktop shell can raise it.
+//
+//   <html>                                     ceiling 2 (default)
+//   <html data-sqr-max-cols="4">               ceiling 4
+//   :root { --sqr-max-cols: 3 }                ceiling 3 (the attribute wins)
+//
+// Below MIN_COL_PX * 2 nothing changes: the phone keeps its single column and
+// its peek, byte for byte.
+const SQR_MAX_COLS_ATTR    = 'data-sqr-max-cols';
+const SQR_MAX_COLS_VAR     = '--sqr-max-cols';
+const SQR_MAX_COLS_DEFAULT = 2;
+const SQR_MIN_COL_PX       = 320;   // a column narrower than this is not a column
+
+function sqrMaxCols() {
+    const el = document.documentElement;
+    const attr = parseFloat(el.getAttribute(SQR_MAX_COLS_ATTR));
+    if (attr > 0) return attr;
+    let v = NaN;
+    try { v = parseFloat(getComputedStyle(el).getPropertyValue(SQR_MAX_COLS_VAR)); } catch (e) {}
+    return v > 0 ? v : SQR_MAX_COLS_DEFAULT;
+}
+
 const SQR_PEEK_CLASS   = 'sqr-peek';        // the switch
 const SQR_PEEK_ATTR    = 'data-sqr-peek';   // the amount, on the same element
 const SQR_PEEK_DEFAULT = 0.89;              // Neo's number: leaves ~11% showing
@@ -97,6 +131,18 @@ function simulateScreen() {
         }else {
             cols=2.1;
         }*/
+        /* THE CEILING (0.3.0). Applied to the band's own `cols` first, then — once
+           the screen is wide enough for two real columns — `cols` becomes the
+           rounded canonical count, capped. 708 -> 2 columns of 354; 823 -> 2 of
+           411; 1104 -> 2 of 552, not 3 of 368; 640 -> 2 of 320; 375 -> 1, peek
+           untouched. */
+        const maxCols = sqrMaxCols();
+        if (cols > maxCols) cols = maxCols;
+        if (width >= SQR_MIN_COL_PX * 2) {
+            cols = Math.max(1, Math.min(maxCols, Math.round(width / simulatedWidth)));
+            if (width / cols < SQR_MIN_COL_PX) cols = Math.max(1, cols - 1);
+        }
+
         console.log("Screen: "+screen );
 //2xs 0-320 watch
 //xs 320-640 phone-xs
@@ -132,8 +178,12 @@ function simulateScreen() {
 //2xl 1280-1536 big monitor
 //3xxl 1536-1920 wide monitor
 
+        /* ONE SOLVER FOR EVERY WIDTH (0.3.0). The old `else` branch below 1024 vs
+           >=1024 is gone: `cols` is now decided once, above, for every screen, so
+           the ratio is one division here and the 1024 boundary stops being a step
+           in the design's size. */
         let ratio = width/simulatedWidth;
-        if(width < 1024 ) {
+        if (true) {
 
             ratio = ratio/cols;
 
@@ -163,10 +213,6 @@ function simulateScreen() {
             // BIGGER as the screen got wider. `cols` is now applied exactly once.
             // The if(cols==1) block above is kept: it is the phone peek, which is a
             // separate feature (also 0.2.0) and not part of this fix. See CHANGELOG 0.2.0.
-        }else {
-            //simply make it smallest adjustments for perfect column fit.
-            simulatedWidth=parseInt(width/simulatedWidth)*simulatedWidth;
-              ratio = width/simulatedWidth;
         }
 
         squareRootStyleTag.innerHTML = (" :root { font-size:"+ ratio*100 +"%; } ");

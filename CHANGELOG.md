@@ -1,5 +1,21 @@
 # Changelog
 
+
+## 0.3.0 — 2026-09-08
+
+**A column ceiling, and one solver for every width.**
+
+Neo's Z Fold (708x823 CSS) showed three columns in both orientations. Two causes: above 1024 the
+solver fitted as many whole canonical columns as the width allowed (1104 / 368 = 3), and the md/lg
+bands asked for fractional counts (1.2, 1.61) that were never a column count.
+
+- New: `data-sqr-max-cols` on `<html>`, or `--sqr-max-cols`, caps how many canonical columns a
+  screen may show. Default **2**. The attribute wins over the custom property.
+- Once a screen can give each column at least 320 CSS px, the count is `round(width / column)`
+  capped by the ceiling — 708 → 2 columns of 354, 823 → 2 of 411, 1104 → 2 of 552, 640 → 2 of 320.
+- Below 640 nothing changes: one column, and the 0.2.0 phone peek untouched.
+- The separate `>= 1024` whole-column branch is removed; `cols` is decided once and applied once,
+  so the 1024 boundary is no longer a step in the design's size.
 All notable changes to Square Root are recorded here.
 This project follows [Semantic Versioning](https://semver.org/).
 
