@@ -1,10 +1,12 @@
 {
   "name": "@all1web/square-root",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "A mobile-first layout framework that scales one canonical design (360×720, built on a researched 60px finger unit) to fit any phone exactly — same proportions on every screen size and aspect ratio, without breakpoints.",
   "keywords": [
     "css",
     "scss",
+    "tailwindcss-plugin",
+    "tailwind-plugin",
     "mobile-first",
     "responsive",
     "layout",
@@ -30,11 +32,13 @@
     "./scss": "./src/square-root.scss",
     "./css": "./dist/square-root.css",
     "./scrollsnap.css": "./dist/scrollsnap.css",
+    "./tailwind": "./plugin.cjs",
     "./src/*": "./src/*",
     "./dist/*": "./dist/*",
     "./package.json": "./package.json"
   },
   "files": [
+    "plugin.cjs",
     "src",
     "dist",
     "docs",
@@ -44,10 +48,20 @@
   ],
   "scripts": {
     "build": "sass src/square-root.scss dist/square-root.css --no-source-map",
-    "watch": "sass --watch src/square-root.scss dist/square-root.css --no-source-map"
+    "watch": "sass --watch src/square-root.scss dist/square-root.css --no-source-map",
+    "verify:plugin": "tailwindcss -c tools/plugin-parity/tailwind.config.js -o tools/plugin-parity/out.css && node tools/plugin-parity/parity.cjs"
+  },
+  "peerDependencies": {
+    "tailwindcss": ">=3.3.0"
+  },
+  "peerDependenciesMeta": {
+    "tailwindcss": {
+      "optional": true
+    }
   },
   "devDependencies": {
-    "sass": "^1.69.0"
+    "sass": "^1.69.0",
+    "tailwindcss": "^3.4.19"
   },
   "sideEffects": [
     "*.css",

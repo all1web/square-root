@@ -1,6 +1,32 @@
 # Changelog
 
 
+## 0.5.0 — 2026-09-09
+
+**The Tailwind plugin.**
+
+Square Root now ships as a Tailwind CSS plugin (`plugin.cjs`, exported as
+`@all1web/square-root/tailwind`) targeting v3.3+ (`plugins: [require(...)]`)
+and v4 (`@plugin`). The SCSS remains the source of truth; the plugin mirrors
+its class surface exactly and `npm run verify:plugin` proves it — a parity
+check that compiles the plugin through Tailwind and compares every selector
+and declaration against `dist/square-root.css` (129 rules, zero drift
+tolerated; benign differences like vendor prefixes and calc factor order are
+normalized, real ones fail the build).
+
+- What Tailwind adds on top of the static CSS: JIT **arbitrary values**
+  (`sqr-w-[1/2]`, `sqr-mt-[1.75]`) — the fractions that don't exist as static
+  classes; IntelliSense autocomplete; purging of unused utilities.
+- What the plugin deliberately does not emit: the scroll-snap layer (link
+  `dist/scrollsnap.css`) and the `2xs:`/`xs:` prefixed classes, whose names
+  collide with Tailwind's variant syntax — use Tailwind's own variants.
+- Known quirks are mirrored, not fixed: `-sqr-h-screen-5` subtracts 4 units in
+  the plugin too, matching the SCSS. Fix both or neither.
+- The solver (`src/square-root.js`) is unchanged and still required — the
+  plugin replaces the stylesheet, never the runtime.
+- Packaging: `tailwindcss >=3.3.0` as an *optional* peerDependency; the
+  package stays dependency-free at runtime.
+
 ## 0.4.0 — 2026-09-08
 
 **Spanning: one section across N macro columns.**
