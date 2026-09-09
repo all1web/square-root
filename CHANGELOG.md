@@ -1,6 +1,46 @@
 # Changelog
 
 
+## 0.4.0 — 2026-09-08
+
+**Spanning: one section across N macro columns.**
+
+Built for the dark Report page's Fold layout (docs/plans/dark-report-page-build.md §3,
+products repo). A card deck that lives in one `sqr-w-6` section on a phone can now widen
+across 2-4 canonical columns once the viewport actually has room for them, in either of
+two layout modes, with zero DOM reordering.
+
+- New: `.sqr-wide-{2,3,4}` — the SECTION's own width. Below the derived gate (`N * 320px`,
+  the package's own `SQR_MIN_COL_PX`, written in rem against the *initial* 16px root so it
+  never drifts with the solved canon) it is byte-identical to `.sqr-w-6`; above the gate it
+  is `N` macro columns wide.
+- New: `.sqr-span-{2,3,4}` + `html.sqr-mode-rows` — **Mode A, aligned rows.** The direct
+  children become a CSS grid, `repeat(N, 1fr)`, `grid-auto-flow: row`; cards alternate
+  left/right/… in document order and the rows line up. A child marked `.sqr-row` spans the
+  full width (`grid-column: 1 / -1`); `.sqr-left` / `.sqr-right` pin an individual card.
+- New: `.sqr-flow-{2,3,4}` + `html.sqr-mode-flow` — **Mode B, masonry fill.** `column-count:
+  N` with `column-fill: balance`; cards fill the left column then the right, no gaps. No
+  JS masonry — native grid masonry is not shipped on Android Chrome, and a JS masonry
+  breaks Livewire morphs and scroll snap. `.sqr-row` spans all columns (`column-span: all`).
+  The container is set to `display: block` for the same reason Mode A sets `display: grid`:
+  multi-column is only honoured on a block container, so a deck the host made a flex row
+  on the phone still splits above the gate.
+- The mode is a class on `<html>` the host sets (a store, not part of this package) — no
+  mode class means flow's grid/column rules simply do not apply and layout stays block.
+- **The ceiling wins.** `:root[data-sqr-max-cols="1"]` (0.3.0) forces every `sqr-wide-*` back
+  to one macro column and every `sqr-span-*` / `sqr-flow-*` back to `display:block` — a page
+  that declares one column never spans, regardless of viewport width.
+- New: a spanning deck is **transparent to the vertical snap rule**.
+  `.scrollsnap-vertical > [class*="sqr-span-"] > .snap-y` (and `sqr-flow-`) re-applies the
+  `scroll-snap-align: start; scroll-snap-stop: always` that `_scrollsnap.scss` gives a direct
+  `.snap-y` child. It is needed because the layout class can never sit on the scrolling
+  column itself — a multi-column box with a definite block-size fragments sideways instead
+  of balancing — so a page whose cards are siblings in that column has to wrap them one
+  element deep, and would otherwise lose every card's snap point. Outside the gate, since
+  the wrapper is in the DOM on the phone too.
+- Emitted after the unit `@for` loop, so `.sqr-wide-#{$n}` beats `.sqr-w-6` on source order
+  alone — no `!important` anywhere in this feature.
+
 ## 0.3.0 — 2026-09-08
 
 **A column ceiling, and one solver for every width.**

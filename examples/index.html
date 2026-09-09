@@ -31,6 +31,11 @@
                 font: 600 12px/1.6 ui-monospace, Menlo, monospace; color: #2dd4bf;
                 padding: .5rem .75rem; }
     .hint     { color: #6b7280; font-weight: 400; }
+    /* Board 2 spacing. NOTE, and it is the whole reason this is a class:
+       an INLINE style would outrank html.sqr-mode-rows .sqr-span-2 { display: grid }
+       and Rows mode could never paint. Never put display (or anything the mode
+       rules set) in a style attribute on a spanning section. */
+    .board2   { margin-bottom: 1.5rem; }
 </style>
 </head>
 <body>
@@ -114,6 +119,82 @@
     </section>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════════════
+     BOARD 2 — SPANNING (0.4.0). Three sqr-wide-2 sections. Below the
+     640px gate each is one plain sqr-w-6 column; above it, each widens
+     to two macro columns and its direct children (six cards + one
+     sqr-row header) lay out under whichever mode is on <html>. To keep
+     the demo readable, the width class AND the layout class sit on the
+     same element here — the section IS the card container — instead of
+     the split (width on <section>, layout on an inner div) a host page
+     needs when something non-card (like an absolutely-positioned bar)
+     sits between them. See report-mobile.blade.php in the products repo
+     for that split in a real page.
+     ═══════════════════════════════════════════════════════════════════ -->
+<div id="board2" style="margin-top: 3rem; padding: 1.5rem .75rem; border-top: 1px solid #2a2a36;">
+    <h2 style="margin: 0 0 .25rem;">Board 2 — spanning sections (0.4.0)</h2>
+    <p style="margin: 0 0 1rem; font-size: .8rem; color: #9aa0b5; max-width: 40rem;">
+        Resize past 640px CSS wide (2 × <code>SQR_MIN_COL_PX</code>) to see each section
+        below widen from one macro column to two. Nothing reorders in the DOM either way —
+        only the paint changes.
+    </p>
+    <div style="display:flex; gap:.5rem; margin-bottom:1.25rem;">
+        <button id="btnModeRows" type="button"
+                style="font:inherit; font-weight:600; padding:.5rem 1rem; border-radius:.5rem;
+                       border:1px solid #313142; background:#1d1d28; color:#e8eaf2; cursor:pointer;">
+            Rows
+        </button>
+        <button id="btnModeFlow" type="button"
+                style="font:inherit; font-weight:600; padding:.5rem 1rem; border-radius:.5rem;
+                       border:1px solid #313142; background:#2dd4bf; color:#06251f; cursor:pointer;">
+            Flow (masonry)
+        </button>
+        <span id="modeReadout" style="align-self:center; font:600 12px/1.6 ui-monospace, Menlo, monospace; color:#2dd4bf;"></span>
+    </div>
+
+    <section class="board2 sqr-wide-2 sqr-span-2 sqr-flow-2">
+        <div class="card sqr-row" style="margin-bottom:.5rem;">
+            <h2>Section A — six cards, one header</h2>
+            <p>This header carries <code>.sqr-row</code>, so it spans both columns in
+               either mode while the six cards below it split across them.</p>
+        </div>
+        <div class="card sqr-h-3" style="margin-bottom:.5rem;"><p>Card 1</p></div>
+        <div class="card sqr-h-4" style="margin-bottom:.5rem;"><p>Card 2 — a little taller</p></div>
+        <div class="card sqr-h-3" style="margin-bottom:.5rem;"><p>Card 3</p></div>
+        <div class="card sqr-h-3" style="margin-bottom:.5rem;"><p>Card 4</p></div>
+        <div class="card sqr-h-5" style="margin-bottom:.5rem;"><p>Card 5 — the tall one</p></div>
+        <div class="card sqr-h-3" style="margin-bottom:.5rem;"><p>Card 6</p></div>
+    </section>
+
+    <section class="board2 sqr-wide-2 sqr-span-2 sqr-flow-2">
+        <div class="card sqr-row" style="margin-bottom:.5rem;">
+            <h2>Section B — six cards, one header</h2>
+            <p>Independent from Section A — each spanning section keeps its own grid or
+               column count, sized to its own children only.</p>
+        </div>
+        <div class="card sqr-h-4" style="margin-bottom:.5rem;"><p>Card 1</p></div>
+        <div class="card sqr-h-3" style="margin-bottom:.5rem;"><p>Card 2</p></div>
+        <div class="card sqr-h-3" style="margin-bottom:.5rem;"><p>Card 3 — a little taller</p></div>
+        <div class="card sqr-h-3" style="margin-bottom:.5rem;"><p>Card 4</p></div>
+        <div class="card sqr-h-3" style="margin-bottom:.5rem;"><p>Card 5</p></div>
+        <div class="card sqr-h-4" style="margin-bottom:.5rem;"><p>Card 6 — the tall one</p></div>
+    </section>
+
+    <section class="board2 sqr-wide-2 sqr-span-2 sqr-flow-2">
+        <div class="card sqr-row" style="margin-bottom:.5rem;">
+            <h2>Section C — six cards, one header</h2>
+            <p>Try the ceiling: <code>document.documentElement.dataset.sqrMaxCols = '1'</code>
+               in the console forces every spanning section here back to one column.</p>
+        </div>
+        <div class="card sqr-h-3" style="margin-bottom:.5rem;"><p>Card 1</p></div>
+        <div class="card sqr-h-3" style="margin-bottom:.5rem;"><p>Card 2</p></div>
+        <div class="card sqr-h-5" style="margin-bottom:.5rem;"><p>Card 3 — the tall one</p></div>
+        <div class="card sqr-h-3" style="margin-bottom:.5rem;"><p>Card 4</p></div>
+        <div class="card sqr-h-4" style="margin-bottom:.5rem;"><p>Card 5</p></div>
+        <div class="card sqr-h-3" style="margin-bottom:.5rem;"><p>Card 6</p></div>
+    </section>
+</div>
+
 <!-- 4. The scaler. It runs on load, on resize and on orientation change. -->
 <script type="module" src="../src/square-root.js"></script>
 
@@ -127,10 +208,30 @@
             `viewport ${innerWidth}×${innerHeight}` +
             ` &nbsp;|&nbsp; root ${root}` +
             ` &nbsp;|&nbsp; canon spans ${Math.round(probe.getBoundingClientRect().width)}px` +
-            ` <span class="hint">(should equal viewport width)</span>`;
+            ` <span class="hint">(= viewport ÷ column count; one column on a phone)</span>`;
     }
     addEventListener('resize', () => setTimeout(report, 1200));
     setTimeout(report, 1200);
+
+    // demo-only: Board 2's mode toggle. The package itself only reads the
+    // class — a real host keeps this choice in whatever it already uses to
+    // remember other UI state (see foldlayout.js in the products repo).
+    const html = document.documentElement;
+    const btnRows = document.getElementById('btnModeRows');
+    const btnFlow = document.getElementById('btnModeFlow');
+    const modeReadout = document.getElementById('modeReadout');
+    function setMode(mode) {
+        html.classList.toggle('sqr-mode-rows', mode === 'rows');
+        html.classList.toggle('sqr-mode-flow', mode === 'flow');
+        btnRows.style.background = mode === 'rows' ? '#2dd4bf' : '#1d1d28';
+        btnRows.style.color = mode === 'rows' ? '#06251f' : '#e8eaf2';
+        btnFlow.style.background = mode === 'flow' ? '#2dd4bf' : '#1d1d28';
+        btnFlow.style.color = mode === 'flow' ? '#06251f' : '#e8eaf2';
+        modeReadout.textContent = `mode: ${mode}`;
+    }
+    btnRows.addEventListener('click', () => setMode('rows'));
+    btnFlow.addEventListener('click', () => setMode('flow'));
+    setMode('flow'); // starting mode for the demo
 </script>
 
 </body>

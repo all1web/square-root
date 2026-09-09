@@ -1,3 +1,4 @@
+@charset "UTF-8";
 :root {
   --macro-width:360;
   --macro-height:720;
@@ -718,6 +719,199 @@
 
 .-sqr-r-8 {
   right: calc(var(--micro-width) * 8 * -0.0625rem);
+}
+
+/* ── SPANNING: one section across N macro columns (0.4.0) ──────────────
+   Threshold derived from the package's OWN constants: a column is not a
+   column below SQR_MIN_COL_PX (320) — square-root.js:56 — so N columns
+   need N*320px. Media queries resolve `rem` against the INITIAL 16px root,
+   never the solved :root font-size, so this stays stable while the solver
+   rescales the design. N*320/16 = N*20rem. */
+/* --macro-width / --micro-width */
+/* = N*320/16 — 0.0625 is the house 1/16 */
+/* WIDTH — the section itself. Below the gate it is one macro column,
+   byte-identical to .sqr-w-6. */
+.sqr-wide-2 {
+  width: calc(var(--micro-width) * 6 * 0.0625rem);
+}
+
+@media (min-width: 40rem) {
+  .sqr-wide-2 {
+    width: calc(var(--micro-width) * 12 * 0.0625rem);
+  }
+  /* MODE A — ALIGNED ROWS. Cards alternate in document order
+     (1 left, 2 right, 3 left …) because that is what grid-auto-flow
+     row does; nothing is reordered, the DOM is untouched. */
+  html.sqr-mode-rows .sqr-span-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-auto-flow: row;
+    column-gap: calc(var(--micro-width) * 0.0625rem);
+    align-content: start;
+  }
+  html.sqr-mode-rows .sqr-span-2 > .sqr-row {
+    grid-column: 1/-1;
+  }
+  /* MODE B — MASONRY FILL. Native grid masonry is not shipped on
+     Android Chrome, so multi-column IS the masonry. No JS, ever:
+     a JS masonry breaks Livewire morphs and scroll snap. */
+  html.sqr-mode-flow .sqr-flow-2 {
+    /* block, for the same reason MODE A states grid: multi-column is
+       only honoured on a block container, so a deck that is a flex row
+       on the phone -- or anything a host stylesheet made it -- would
+       silently stay one column here while MODE A worked. The two modes
+       answer the same markup, so each states the display it needs. */
+    display: block;
+    column-count: 2;
+    column-gap: calc(var(--micro-width) * 0.0625rem);
+    column-fill: balance;
+  }
+  html.sqr-mode-flow .sqr-flow-2 > * {
+    break-inside: avoid;
+  }
+  html.sqr-mode-flow .sqr-flow-2 > .sqr-row {
+    column-span: all;
+  }
+  /* per-card pin — a utility on the card, never a layout fork */
+  html.sqr-mode-rows .sqr-span-2 > .sqr-left {
+    grid-column: 1;
+  }
+  html.sqr-mode-rows .sqr-span-2 > .sqr-right {
+    grid-column: 2;
+  }
+}
+/* = N*320/16 — 0.0625 is the house 1/16 */
+/* WIDTH — the section itself. Below the gate it is one macro column,
+   byte-identical to .sqr-w-6. */
+.sqr-wide-3 {
+  width: calc(var(--micro-width) * 6 * 0.0625rem);
+}
+
+@media (min-width: 60rem) {
+  .sqr-wide-3 {
+    width: calc(var(--micro-width) * 18 * 0.0625rem);
+  }
+  /* MODE A — ALIGNED ROWS. Cards alternate in document order
+     (1 left, 2 right, 3 left …) because that is what grid-auto-flow
+     row does; nothing is reordered, the DOM is untouched. */
+  html.sqr-mode-rows .sqr-span-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-flow: row;
+    column-gap: calc(var(--micro-width) * 0.0625rem);
+    align-content: start;
+  }
+  html.sqr-mode-rows .sqr-span-3 > .sqr-row {
+    grid-column: 1/-1;
+  }
+  /* MODE B — MASONRY FILL. Native grid masonry is not shipped on
+     Android Chrome, so multi-column IS the masonry. No JS, ever:
+     a JS masonry breaks Livewire morphs and scroll snap. */
+  html.sqr-mode-flow .sqr-flow-3 {
+    /* block, for the same reason MODE A states grid: multi-column is
+       only honoured on a block container, so a deck that is a flex row
+       on the phone -- or anything a host stylesheet made it -- would
+       silently stay one column here while MODE A worked. The two modes
+       answer the same markup, so each states the display it needs. */
+    display: block;
+    column-count: 3;
+    column-gap: calc(var(--micro-width) * 0.0625rem);
+    column-fill: balance;
+  }
+  html.sqr-mode-flow .sqr-flow-3 > * {
+    break-inside: avoid;
+  }
+  html.sqr-mode-flow .sqr-flow-3 > .sqr-row {
+    column-span: all;
+  }
+  /* per-card pin — a utility on the card, never a layout fork */
+  html.sqr-mode-rows .sqr-span-3 > .sqr-left {
+    grid-column: 1;
+  }
+  html.sqr-mode-rows .sqr-span-3 > .sqr-right {
+    grid-column: 2;
+  }
+}
+/* = N*320/16 — 0.0625 is the house 1/16 */
+/* WIDTH — the section itself. Below the gate it is one macro column,
+   byte-identical to .sqr-w-6. */
+.sqr-wide-4 {
+  width: calc(var(--micro-width) * 6 * 0.0625rem);
+}
+
+@media (min-width: 80rem) {
+  .sqr-wide-4 {
+    width: calc(var(--micro-width) * 24 * 0.0625rem);
+  }
+  /* MODE A — ALIGNED ROWS. Cards alternate in document order
+     (1 left, 2 right, 3 left …) because that is what grid-auto-flow
+     row does; nothing is reordered, the DOM is untouched. */
+  html.sqr-mode-rows .sqr-span-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-flow: row;
+    column-gap: calc(var(--micro-width) * 0.0625rem);
+    align-content: start;
+  }
+  html.sqr-mode-rows .sqr-span-4 > .sqr-row {
+    grid-column: 1/-1;
+  }
+  /* MODE B — MASONRY FILL. Native grid masonry is not shipped on
+     Android Chrome, so multi-column IS the masonry. No JS, ever:
+     a JS masonry breaks Livewire morphs and scroll snap. */
+  html.sqr-mode-flow .sqr-flow-4 {
+    /* block, for the same reason MODE A states grid: multi-column is
+       only honoured on a block container, so a deck that is a flex row
+       on the phone -- or anything a host stylesheet made it -- would
+       silently stay one column here while MODE A worked. The two modes
+       answer the same markup, so each states the display it needs. */
+    display: block;
+    column-count: 4;
+    column-gap: calc(var(--micro-width) * 0.0625rem);
+    column-fill: balance;
+  }
+  html.sqr-mode-flow .sqr-flow-4 > * {
+    break-inside: avoid;
+  }
+  html.sqr-mode-flow .sqr-flow-4 > .sqr-row {
+    column-span: all;
+  }
+  /* per-card pin — a utility on the card, never a layout fork */
+  html.sqr-mode-rows .sqr-span-4 > .sqr-left {
+    grid-column: 1;
+  }
+  html.sqr-mode-rows .sqr-span-4 > .sqr-right {
+    grid-column: 2;
+  }
+}
+/* THE CEILING WINS. A page that declares one column never spans. */
+:root[data-sqr-max-cols="1"] [class*=sqr-wide-] {
+  width: calc(var(--micro-width) * 6 * 0.0625rem);
+}
+
+:root[data-sqr-max-cols="1"] [class*=sqr-span-],
+:root[data-sqr-max-cols="1"] [class*=sqr-flow-] {
+  display: block;
+  column-count: initial;
+}
+
+/* NO MODE CLASS ON <html> = flow (the default the store writes). */
+html:not(.sqr-mode-rows):not(.sqr-mode-flow) { /* see docs: host must set one */ }
+
+/* A SPANNING DECK IS TRANSPARENT TO THE VERTICAL SNAP RULE.
+   _scrollsnap.scss gives scroll-snap-align to `.scrollsnap-vertical > .snap-y`,
+   a DIRECT child, on purpose. But the layout class can never go on the snapping
+   column itself: a multi-column box with a definite block-size (and that column
+   is height:100vh) does not balance — it fragments into height-bound columns
+   that run off sideways. So on a page whose cards are siblings in the column,
+   the deck has to be one element deep, and that would silently cost every card
+   its snap. This puts the rule back, one level down, and only for markup that
+   opted into spanning. Deliberately outside the gate: the deck element exists
+   on the phone too, where it is otherwise inert. */
+.scrollsnap-vertical > [class*=sqr-span-] > .snap-y,
+.scrollsnap-vertical > [class*=sqr-flow-] > .snap-y {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
 
 /*

@@ -61,6 +61,48 @@ Same fraction of the screen on both. That is the whole trick.
 
 ---
 
+## Built hand in hand with Tailwind
+
+This is by design, not coincidence, and it is the reason Tailwind was chosen over Bootstrap (whose
+scale had to be stripped out first). **Tailwind's default spacing, type and radius scales are rem.
+Square Root's unit is rem. The solver moves only the root font-size and never `--micro-width`.** So
+every rem-based Tailwind utility is *already* a finger unit — the same number on every device:
+
+```
+1u = var(--micro-width) × 0.0625rem = 60 × 0.0625rem = 3.75rem
+any rem value  →  finger units = rem ÷ 3.75
+```
+
+| Tailwind class | value | finger units | at the 360 canon |
+|---|---|---|---|
+| `p-1` / `m-1` / `gap-1` | `0.25rem` | `0.06667u` | 4px |
+| `p-2` | `0.5rem` | `0.13333u` | 8px |
+| `p-3` · `text-xs` · `rounded-xl` | `0.75rem` | `0.20000u` | 12px |
+| `p-4` · `text-base` · `rounded-2xl` | `1rem` | `0.26667u` | 16px |
+| `text-sm` | `0.875rem` | `0.23333u` | 14px |
+| `w-8` / `h-8` | `2rem` | `0.53333u` | 32px |
+| `w-11` / `h-11` | `2.75rem` | `0.73333u` | 44px |
+| `w-16` · `pb-16` | `4rem` | `1.06667u` | 64px |
+| `sqr-w-1` | `3.75rem` | `1u` | 60px |
+
+`p-3` and `.sqr-w-1/5` are the same ruler; you can mix them freely, and a layout authored in
+Tailwind classes scales exactly as one authored in `sqr-*` classes. When a house rule asks for every
+length to be *written* as a finger unit, the conversion is the exact fraction above — never a
+rounded table (`0.19u` for `0.75rem` is a 5 % error that compounds down a column).
+
+**What is not on the ruler** (these do not scale with the root):
+
+| | example | rule |
+|---|---|---|
+| px utilities | `border-2`, `ring-2`, `w-px`, `shadow-*` offsets | keep 1px hairlines; convert the rest to `sqr-*` or `calc()` |
+| arbitrary px values | `text-[11px]`, `w-[30px]`, inline `top: 30px` | convert: `N = px ÷ 60` at the canon |
+| breakpoints | `md:` = `@media (min-width: 768px)` | leave — media queries read the initial root on purpose; the column count is `data-sqr-max-cols` |
+| `rounded-full` | `9999px` | a shape, not a length — leave |
+
+More in [INTEGRATION.md §7](docs/INTEGRATION.md#7-running-tailwind-css-alongside-square-root).
+
+---
+
 ## Install
 
 **As a dependency**
@@ -179,6 +221,87 @@ Use `-sqr-h-screen-N` for a scroll pane that sits under a fixed N-finger header.
 Two responsive helpers ship as well: `.2xs:hidden` / `.2xs:block` fire at `max-width: 320px` (watches), and `.xs:sqr-my-1\/2` / `.xs:sqr-mx-1\/4` fire at `min-width: 321px`. Escape the class names in HTML as `2xs:hidden` and `xs:sqr-mx-1/4` — the backslashes are only there in the CSS.
 
 A landscape rule at `(orientation: landscape) and (min-width: 361px) and (max-width: 768px)` swaps the canon to **720 × 360** for the four `sqr-macro-*` / `sqr-micro-*` classes, so the probe measures a rotated device and the JS solves against the long edge. The generated `sqr-w-N` / `sqr-h-N` scales are not swapped — they read `--micro-width` on both axes, which is harmless while `--micro-width` and `--micro-height` are both 60.
+
+---
+
+## Spanning: one section across N macro columns
+
+*New in 0.4.0.* A card deck that is one `sqr-w-6` column on a phone can widen to 2–4
+canonical columns once the viewport actually has room for them — no breakpoint you author,
+no DOM reorder, no JS masonry.
+
+**The width, and the derived gate.** `.sqr-wide-2` / `.sqr-wide-3` / `.sqr-wide-4` put on a
+section: below the gate the section is exactly `.sqr-w-6` (one macro column); above it, `N`
+macro columns wide. The gate is derived from the package's own floor for what counts as a
+column — `SQR_MIN_COL_PX` (320, `square-root.js`) — so `N` columns need `N * 320px` of
+viewport, written as `N * 20rem` (`320 / 16`). That `rem` is deliberately measured against
+the browser's un-solved 16px initial root, not the canon's own solved font-size: a media
+query re-evaluates against the *initial* value, so the gate stays put while `square-root.js`
+rescales everything else.
+
+```html
+<section class="sqr-w-6 sqr-wide-2">
+  <div class="sqr-span-2">          <!-- or sqr-flow-2 — see the two modes below -->
+    <div class="card">1</div>
+    <div class="card">2</div>
+    <div class="card">3</div>
+  </div>
+</section>
+```
+
+The width class goes on the section itself; the layout class (`sqr-span-N` / `sqr-flow-N`)
+goes on whichever element's **direct children are the cards** — those are not always the
+same element (an `absolute`-positioned bar between them, for instance, is neither).
+
+**Never put the layout class on a scrolling column.** If the cards are siblings inside a
+`.scrollsnap-vertical` column, wrap them in one deck element and put `sqr-span-N` /
+`sqr-flow-N` on *that*. A multi-column box with a definite block-size (and that column is
+`height: 100vh`) does not balance into N columns — it fragments into height-bound columns
+that run off sideways, usually straight into the column's own `overflow-x: hidden`. The
+wrapper costs nothing: spanning ships a rule that keeps
+`.scrollsnap-vertical > [class*="sqr-span-"] > .snap-y` snapping, so the cards keep the
+snap positions the direct-child rule used to give them.
+
+**Two modes, chosen by a class on `<html>`** — this package does not pick one for you:
+
+- **`html.sqr-mode-rows` + `.sqr-span-N`** — **aligned rows.** The container becomes a CSS
+  grid, `repeat(N, 1fr)`, `grid-auto-flow: row`. Cards alternate across the row in document
+  order (card 1 left, card 2 right, card 3 starts the next row) — nothing is reordered, the
+  DOM is untouched, only the *painted* position changes. A child marked `.sqr-row` spans the
+  full width (`grid-column: 1 / -1`) — a section header inside the deck, say. `.sqr-left` /
+  `.sqr-right` pin one specific card to a column if you need to override the alternation.
+- **`html.sqr-mode-flow` + `.sqr-flow-N`** — **masonry fill.** `column-count: N` with
+  `column-fill: balance`; cards fill the left column top to bottom, then the right, so
+  uneven card heights never leave a gap the way aligned rows can. **No JS, ever** — native
+  grid masonry is not shipped on Android Chrome, so CSS multi-column IS the masonry, and a
+  JS-driven masonry is exactly the kind of DOM surgery that breaks a Livewire morph or a
+  scroll-snap container mid-scroll. `.sqr-row` spans every column (`column-span: all`).
+  Each mode states the `display` it needs — `grid` for rows, `block` for flow — because
+  multi-column is only honoured on a block container.
+
+With no `sqr-mode-rows` / `sqr-mode-flow` class on `<html>` at all, neither rule matches and
+the deck stays block — pick a default, and remember it is a plain class toggle:
+
+```js
+document.documentElement.classList.add('sqr-mode-flow');   // or 'sqr-mode-rows'
+```
+
+**One trap.** Never set `display` (or `column-count`) in a `style="…"` attribute on a
+spanning deck: an inline declaration outranks every class selector, so the mode rules can
+never paint and one of the two modes silently does nothing — put spacing and anything else
+a demo or host page needs in a class.
+
+**The ceiling wins.** `data-sqr-max-cols="1"` (the 0.3.0 column ceiling) forces every
+`sqr-wide-*` back to one macro column and every `sqr-span-*` / `sqr-flow-*` back to
+`display: block`, at any viewport width — a page that declares one column never spans,
+full stop.
+
+**Source order, not `!important`.** The spanning rules are emitted after the unit `@for`
+loop, so `.sqr-wide-2` beats the earlier `.sqr-w-6` on source order alone if you ever apply
+both — you don't need to, `.sqr-wide-N` already equals `.sqr-w-6` below its own gate.
+
+Try it: the second board in [`examples/index.html`](examples/index.html) has three spanning
+sections and two buttons that flip between the modes live.
 
 ---
 

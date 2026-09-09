@@ -129,6 +129,13 @@ into the scale itself rather than adding UI to explain the gesture.
 3. **Keep the units commensurate.** 360 = 6 × 60 and 720 = 12 × 60 means macro
    and micro never fight.
 4. **Build affordances into the geometry.** The peek is spacing, not a widget.
+5. **Share the ruler with the utility framework.** The unit is rem
+   (`--micro-width × 0.0625rem` = 3.75rem) and the solver moves only the root
+   font-size, so Tailwind's rem scales — spacing, type, radius — are finger
+   units without translation (`p-3` = 0.75rem = 0.2u on every device). That is
+   why Tailwind, whose scale is rem, replaced Bootstrap, whose scale had to be
+   stripped out. Anything in px (`border-2`, `text-[11px]`, `top: 30px`) is off
+   the ruler and is the first thing to convert.
 
 If you change a constant, change it knowing which of these it serves. Overriding
 `--macro-width` to target a different reference device is supported and
