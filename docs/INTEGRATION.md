@@ -322,7 +322,11 @@ The canon lives entirely in CSS custom properties:
 }
 ```
 
-The JS reads **none** of these. It measures `.sqr-macro-rem`, whose width is derived from `--macro-width`. (`let idealSqrPixelWidth = 360;` exists on line 76 but is dead — the only code that used it is commented out.) So overriding the variables is sufficient and complete: change them and both the utilities *and* the solver follow.
+The JS reads **none of these in the default `css` mode, and none of them in `contain`**. It
+measures `.sqr-macro-rem`, whose width is derived from `--macro-width`. The one exception is
+`data-sqr-fit="stack"` (0.6.0), which reads three of them — `--macro-width`, `--macro-height` and
+`--micro-width` — to work out how many finger units tall the canon is; and reading them is
+precisely what makes an overridden canon work in `stack` mode instead of silently assuming 12. (`let idealSqrPixelWidth = 360;` exists on line 76 but is dead — the only code that used it is commented out.) So overriding the variables is sufficient and complete: change them and both the utilities *and* the solver follow.
 
 The two variables do different jobs:
 
@@ -404,6 +408,47 @@ Incomplete, and you should know why: the `screen.orientation` change listener ad
 ### 6.3 Keeping Square Root for layout but not for type
 
 If the desktop objection is really "my body text gets huge/tiny", you do not need to disable the solver. Set type in `px` (or `pt`, `ch`, `vw`) instead of rem for the elements you want frozen, and leave layout on `sqr-*`. See §7 — this is the same trade-off Tailwind users hit.
+
+### 6.4 Or, instead of turning it off: fit the height (`data-sqr-fit`)
+
+Turning the solver off is the blunt answer to "this design is wrong on a wide screen". 0.6.0 has a
+narrower one — six lines to choose from:
+
+- **A phone-shaped product, portrait, scrolling pages** → leave it alone. `css` is the default and
+  height never binds on a tall screen anyway.
+- **A board that owns the viewport** — a `height: 100vh` snap column, a kiosk, a dashboard panel →
+  `data-sqr-fit="stack"`. It is free on 4:3 and taller and only gives ground on the laptop class.
+- **Something that must be seen whole** — a card, a certificate, a game board, a print preview →
+  `data-sqr-fit="contain"`, and expect bare width on the sides.
+- **A long scrolling document on mobile** → *not* a height mode: the URL bar collapsing is a
+  height-only resize, and the page will rescale under the reader.
+- **A desktop template that should just use a 16px root** → §6.1 still applies; a height mode is not
+  a substitute for not running the solver.
+- **Server-render the choice** with `--sqr-fit` on `:root` and keep `data-sqr-fit` for live changes.
+- **A short wide window — a split screen, a foldable, a landscape board** → that is a column
+  question, not a height question: `data-sqr-short="cols"` (§6.5). A height mode shrinks the design
+  to fit; the short switch gives the width to a second column instead.
+
+### 6.5 Or: let the stylesheet follow the solver (`data-sqr-short`)
+
+0.7.0's switch answers a different question from §6.4's. `data-sqr-fit` asks *how big*; this asks
+*how many*, and it closes a seam: `square-root.scss`'s N-column rules are gated on raw pixels
+(`@media (min-width: N × 320px)`), while the solver measures against the probe. Where the landscape
+media query has rotated the canon, those disagree — a 637 × 320 window is two macro columns to the
+solver and one to the stylesheet.
+
+- **A phone-shaped product, portrait** → leave it alone. The trigger cannot fire on a screen taller
+  than it is wide.
+- **A foldable or a split-screen host** → `data-sqr-short="cols"` on `<html>`, set before the first
+  solve. The solver publishes `data-sqr-cols` and the N-column rules follow it.
+- **A desktop shell with `data-sqr-max-cols` ≥ 3** → the same switch, and now the pass itself
+  engages: a short wide board takes a third column at the finger the aspect allows.
+- **A two-column touch template** → the pass is provably inert there; the switch is purely the seam.
+  Nothing you have solved changes size.
+- **Server-render the choice** with `--sqr-short` on `:root` and keep `data-sqr-short` for live
+  changes, exactly as with `--sqr-fit`.
+
+See the README's [Short screens](../README.md#short-screens-data-sqr-short) for the settings table.
 
 ---
 

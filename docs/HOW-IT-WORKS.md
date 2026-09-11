@@ -201,7 +201,9 @@ setTimeout(function(){
 
 **Why the timeout matters.** Writing `innerHTML` on the style tag only invalidates layout; the browser has not recomputed anything yet. `offsetWidth` is a forced-synchronous-layout read, so in principle it flushes — but the reset changes the *root font-size*, which invalidates every rem length on the page, and the source treats that as something to let the browser settle rather than race. The 500 ms is a deliberately generous "let it reflow" pause, not a tuned number. The author's own comment on the abandoned pixel-math approach names the problem directly: *"browser lags and has to calculate at the time its rendered."*
 
-So `simulatedWidth` is the **live rendered width of the canonical device at a 16 px root** — normally 360, but *not* always (see the landscape swap in §8, and page zoom or a user-set default font size, both of which this design absorbs correctly precisely because it measures rather than assumes).
+So `simulatedWidth` is the **live rendered width of the canonical device at a 16 px root** — normally 360, but *not* always (see the landscape swap in §9, and page zoom or a user-set default font size, both of which this design absorbs correctly precisely because it measures rather than assumes).
+
+Since 0.6.0 the same read also takes `macroRem.offsetHeight` into `simulatedHeight` when a height mode is on (§7.2) — the same element, the same reflow, the same instant, which is what lets the height solve compose with the landscape swap of §9 without ever knowing the media query exists.
 
 ### Step 3 — bucket the screen
 
@@ -232,6 +234,26 @@ if(width < 1024 ) {
 ```
 
 The core is one line: **`ratio = viewportWidth / canonicalWidthAsRendered`**. On a phone with the peek switch off — the default — that is the entire computation, because `sqrPeekFactor()` returns exactly `1` and `cols` is `1`. The rest is the peek adjustment (§7.1) and the desktop column fit (§8).
+
+### Step 4a — fit the height (0.6.0, opt-in)
+
+```js
+if (sqrFit !== SQR_FIT_CSS) {
+    const ratioW = ratio;
+    const budget = (sqrFit === SQR_FIT_STACK)          // stack, and ONLY stack,
+                 ? simulatedHeight * Math.min(1, sqrStack() /   // reads the canon
+                       sqrCanonUnitsDown(simulatedWidth, simulatedHeight))
+                 : simulatedHeight;
+    const ratioH = height / budget;
+    ratio = Math.min(ratio, ratioH);
+    ratio = Math.max(ratio, sqrFitFloor() * ratioW);
+}
+```
+
+In the default `css` mode **not one statement of this block runs** — including the `offsetHeight`
+read up in Step 2 — so the number Step 5 writes is produced by the same operations on the same
+inputs as 0.5.0. This is a stronger guarantee than the peek's `x * 1`: identical digits *and*
+identical work. Full detail in §7.2.
 
 ### Step 5 — write the answer
 
@@ -485,6 +507,307 @@ A larger 2xl bucket (`cols = 2.1`) exists as commented-out source and is **not a
 
 ---
 
+## 7.2 The fit switch (`data-sqr-fit`)
+
+*New in 0.6.0. **Off by default.***
+
+§7.1 is a switch that makes the design *smaller than the width solve on purpose*. This is the other
+one: a switch that makes it smaller **when the screen is too short for it**, which §5's solve has no
+way to notice, because it only ever reads the probe's width.
+
+### The three modes
+
+| mode | `ratioH` | binds when |
+|---|---|---|
+| `css` (default) | not computed | never — 0.5.0 exactly |
+| `contain` | `H / probeHeight` | viewport aspect `H/W < (probeH/probeW)/cols` |
+| `stack` | `H / (probeHeight × min(1, STACK/unitsDown))` | `H/W < ((probeH/probeW)/cols) × min(1, STACK/unitsDown)` |
+
+`probeH/probeW` is `2` for the portrait canon, so with the defaults and no swap those read `2/cols`
+and "wider than 4:3". They are written against the probe rather than against the constant `2` on
+purpose: where §9's media query has rotated the probe the aspect is `0.5`, and a `2/cols` condition
+would predict "binds" on the 667 × 375 row of the table below — the one row where nothing binds.
+
+and in both height modes:
+
+```
+ratio = min(ratioW, ratioH)
+ratio = max(ratio, FLOOR × ratioW)
+```
+
+where `ratioW` is §5 Step 4's answer — the `css`-mode ratio, after `cols` and after peek.
+
+`H` is `document.documentElement.clientHeight`, falling back to `window.innerHeight` for a
+quirks-mode document. It is **not** "what `100vh` resolves to" — on mobile a URL-bar collapse resizes
+the layout viewport, so `clientHeight` moves while `100vh` stays pinned to the large viewport. It is
+chosen because it is the **conservative** height: the root element's own content height, which where
+it differs from `100vh` is the smaller of the two, having excluded a classic horizontal scrollbar —
+and this framework's boxes sit on `snap-x` scrollers (`src/_scrollsnap.scss`), so that scrollbar is
+not hypothetical. A contain-fit should fit the canon into what the reader can see.
+
+### Why the stack budget is clamped at the canon
+
+`unitsDown` is how many finger units tall the canon is **as the page currently has it** — 12 for the
+360 × 720 portrait canon, 6 when §9's landscape media query has rotated the probe to 720 × 360. It
+is derived from `--macro-*` / `--micro-*`, with the rotation **detected from the probe's measured
+aspect**, not inferred from `window.innerWidth > window.innerHeight`. Those are different questions:
+the media query is bounded 361–768, so an 812 × 375 phone is in landscape while the canon has *not*
+rotated.
+
+Without the `min(1, …)` clamp, a 9-unit budget on a rotated phone would demand one and a half
+canons of height and shrink a screen the CSS swap had already scaled correctly by about 30%. With
+it, `stack` degenerates to `contain` under the swap, and the three modes are ordered at every
+viewport:
+
+> **`ratio_css` ≥ `ratio_stack` ≥ `ratio_contain`** — always.
+
+### Worked table: eight viewports × three modes
+
+Peek off, `data-sqr-max-cols` unset (2), `STACK = 9`, `FLOOR = 0.7`, 16px browser default.
+`probe` is measured at the 100% reset. `root px = ratio × 16`.
+
+| viewport | mode | probe | cols | ratioW | ratioH | ratio | root px | floor |
+|---|---|---|---|---|---|---|---|---|
+| 375 × 812 | css | 360×720 | 1 | 1.0416667 | — | 1.0416667 | 16.667 | |
+| 375 × 812 | contain | 360×720 | 1 | 1.0416667 | 1.1277778 | 1.0416667 | 16.667 | |
+| 375 × 812 | stack | 360×720 | 1 | 1.0416667 | 1.5037037 | 1.0416667 | 16.667 | |
+| 812 × 375 | css | 360×720 | 2 | 1.1277778 | — | 1.1277778 | 18.044 | |
+| 812 × 375 | contain | 360×720 | 2 | 1.1277778 | 0.5208333 | 0.7894444 | 12.631 | **binds** |
+| 812 × 375 | stack | 360×720 | 2 | 1.1277778 | 0.6944444 | 0.7894444 | 12.631 | **binds** |
+| 362 × 926 | css | 360×720 | 1 | 1.0055556 | — | 1.0055556 | 16.089 | |
+| 362 × 926 | contain | 360×720 | 1 | 1.0055556 | 1.2861111 | 1.0055556 | 16.089 | |
+| 362 × 926 | stack | 360×720 | 1 | 1.0055556 | 1.7148148 | 1.0055556 | 16.089 | |
+| 708 × 823 | css | 360×720 | 2 | 0.9833333 | — | 0.9833333 | 15.733 | |
+| 708 × 823 | contain | 360×720 | 2 | 0.9833333 | 1.1430556 | 0.9833333 | 15.733 | |
+| 708 × 823 | stack | 360×720 | 2 | 0.9833333 | 1.5240741 | 0.9833333 | 15.733 | |
+| 768 × 768 | css | 360×720 | 2 | 1.0666667 | — | 1.0666667 | 17.067 | |
+| 768 × 768 | contain | 360×720 | 2 | 1.0666667 | 1.0666667 | 1.0666667 | 17.067 | |
+| 768 × 768 | stack | 360×720 | 2 | 1.0666667 | 1.4222222 | 1.0666667 | 17.067 | |
+| 1024 × 768 | css | 360×720 | 2 | 1.4222222 | — | 1.4222222 | 22.756 | |
+| 1024 × 768 | contain | 360×720 | 2 | 1.4222222 | 1.0666667 | 1.0666667 | 17.067 | |
+| 1024 × 768 | stack | 360×720 | 2 | 1.4222222 | 1.4222222 | 1.4222222 | 22.756 | |
+| 1366 × 768 | css | 360×720 | 2 | 1.8972222 | — | 1.8972222 | 30.356 | |
+| 1366 × 768 | contain | 360×720 | 2 | 1.8972222 | 1.0666667 | 1.3280556 | 21.249 | **binds** |
+| 1366 × 768 | stack | 360×720 | 2 | 1.8972222 | 1.4222222 | 1.4222222 | 22.756 | |
+| 667 × 375 | css | **720×360** | 1 | 0.9263889 | — | 0.9263889 | 14.822 | |
+| 667 × 375 | contain | **720×360** | 1 | 0.9263889 | 1.0416667 | 0.9263889 | 14.822 | |
+| 667 × 375 | stack | **720×360** | 1 | 0.9263889 | 1.0416667 | 0.9263889 | 14.822 | |
+
+Four things fall out of it, and all four are load-bearing:
+
+1. **Six of the eight viewports are identical in all three modes.** Every portrait screen, the Fold
+   in both orientations, and the rotated phone the §9 swap covers. The switch is inert exactly where
+   the framework was already right.
+2. **667 × 375 is the composition proof.** It is the only row where the §9 media query fires
+   (`361 ≤ 667 ≤ 768`, landscape), so the probe is 720 × 360 and the canon is 6 units tall. Both
+   height modes measure that and agree with the CSS — nothing double-shrinks. Note that
+   **812 × 375 is not this case**: 812 > 768, so the query does not fire and the canon is still
+   portrait on a 375px-tall screen. That is why 812 is the hardest row in the table.
+3. **768 × 768 is the fixed point.** Two canonical columns of a 1:2 canon is exactly a square, so
+   `contain` and `css` produce the identical ratio on a square screen. (The §9 query does not fire
+   here either: CSS defines `portrait` as `height >= width`, so a square viewport is portrait — the
+   768 overlap §7 warns about resolves in our favour.)
+4. **1024 × 768 is where `stack`'s default comes from.** `1024/720` and `768/540` are both
+   1.4222222, because 12 units across against 9 down is 4:3. `stack` costs exactly nothing at 4:3
+   and only starts costing above it.
+
+### Reading the settings, and flipping them live
+
+| | attribute (wins) | custom property | default | fallback |
+|---|---|---|---|---|
+| mode | `data-sqr-fit` | `--sqr-fit` | `css` | anything unrecognised → `css` |
+| budget | `data-sqr-stack` | `--sqr-stack` | `9` | non-finite or ≤ 0 → 9 |
+| floor | `data-sqr-fit-floor` | `--sqr-fit-floor` | `0.7` | missing/empty/non-finite → 0.7; clamped 0–1 |
+
+The `MutationObserver` of §10 now watches `data-sqr-fit`, `data-sqr-stack` and
+`data-sqr-fit-floor` alongside `class` and `data-sqr-peek`, comparing a signature string with the
+same early return. It reads **attributes only**: consulting the custom properties there would mean a
+style flush on every class write a host app makes. So the custom property is the server-rendered
+default and the attribute is the live switch — the same split `--sqr-max-cols` has had since 0.3.0.
+After changing a custom property, call `window.squareRootResolve()`.
+
+One consequence is specific to the fit switch, and the peek does not share it. The signature reads
+`sqrPeekFactor()`, which reads the *class*, so a class-driven peek change re-solves. There is no
+equivalent for the mode: a rule such as `html.dark { --sqr-fit: stack }` changes the effective mode
+with no attribute write, so the signature is unchanged and the page keeps the old mode until the next
+resize. Drive the mode by attribute, or call `window.squareRootResolve()` after the class flip.
+
+### Degenerate inputs
+
+| input | result | why |
+|---|---|---|
+| probe `display:none` → `probeHeight` 0 | `ratioH = Infinity`, `min` returns `ratioW` | the mode degrades to `css`, not to `Infinity` |
+| `H` 0 | `ratioH = 0`, floor returns `FLOOR × ratioW` | the floor is the zero guard too |
+| `probeHeight` 0 **and** `H` 0 | `ratioH = 0/0 = NaN` → `font-size:NaN%`, an invalid declaration the browser drops; the root stays at the 100% reset | `Math.max` is not a NaN guard. Not new: 0.5.0 already writes `font-size:Infinity%` when `simulatedWidth` is 0, with the same outcome. Documented rather than guarded — a branch here would trade one unsolved page for another |
+| `data-sqr-fit-floor="0"` | no floor | `contain` may shrink without limit |
+| `data-sqr-fit-floor="1"` | the height modes are disabled | `max(ratio, 1 × ratioW) === ratioW` |
+| stylesheet missing entirely | `unitsDown` falls back to 12 | the probe is 0 wide by then anyway |
+
+### ⚠ What it costs
+
+The same caveat §7.1 spends a page on applies here and is worth restating in one line: **with a
+height mode on, the canon is no longer the viewport width**, so `sqr-w-6` is not full-bleed. Unlike
+the peek, the amount is set by the screen's aspect rather than by a factor you chose — see the cost
+table in the README.
+
+Two costs are specific to this feature:
+
+1. **Height-only resizes now rescale the page.** `onresize` fires on them, and in a height mode the
+   solve lands on a different number. On mobile the collapsing URL bar is such a resize. `H` is read
+   from the layout viewport to damp it, not to eliminate it. Use a height mode on a board that owns
+   the viewport, not on a long scrolling document.
+2. **`stack` reads three custom properties** — `--macro-width`, `--macro-height`, `--micro-width`,
+   and it reads them inside its own branch. `contain` and `css` read none. See
+   [INTEGRATION.md §5](INTEGRATION.md) — this is the one place the JS looks at the canon variables,
+   and it is what makes an overridden canon work in `stack` mode instead of silently using 12.
+
+---
+
+## 7.3 Short screens (`data-sqr-short`)
+
+*New in 0.7.0. **Off by default.***
+
+§7.2 answers "is the screen too short for this design" by shrinking the design. This section answers
+a different question the ceiling (§8, `data-sqr-max-cols`) cannot: "is the screen too short for this
+**column**, when it has room for another one instead?" The ceiling only ever asks how *wide* a column
+is; it has no opinion on how *tall* the screen offers to be.
+
+### The seam it closes
+
+`square-root.scss`'s N-column rules are gated on `@media (min-width: N × 320px)` — raw pixels,
+resolved against the initial 16px root, per §1's canonical-device argument. §5's solve is measured
+against the probe instead. §9's landscape query keeps those two in step for the *scale* (both read
+360 or 720, together), but not for the *column count*: a 637 × 320 window is two macro columns wide
+to the solver (the probe rotated) and one to the stylesheet (637 < 640). `data-sqr-cols`, written by
+the solver and read by the stylesheet, is the mechanism that forces the two to agree — the same
+Correspondence argument the probe rotation itself is built on.
+
+### The rule
+
+After §8's ceiling has produced a `cols`, and while `data-sqr-short="cols"`:
+
+```
+a       = height / width                              (0 if unlaid-out → treated as 1)
+need    = floor + (1 − floor) × min(1, a)              floor = data-sqr-short-floor, default 0.6
+trigger = width / cols > height × aspect               aspect = data-sqr-short-aspect, default 1.2
+
+while cols + 1 <= maxCols and trigger:
+    if width / (probe × (cols + 1)) < need: break
+    cols = cols + 1
+```
+
+The trigger is re-evaluated every turn, so on a raised ceiling the loop stops as soon as the column
+is no longer short — it does not run to `maxCols` on a merely wide screen. `need` is the finger floor
+this pass uses *in place of* the fixed 320px column floor: a square screen (`a = 1`) demands a whole
+canonical finger; an infinitely flat one (`a → 0`) accepts `floor` of one.
+
+### Publishing the count — the seam's own floor
+
+`data-sqr-cols` is not simply `cols × macroCols` (the solved count times how many macro columns the
+probe spans — 1 portrait, 2 rotated). That product reflects the *probe's* rotation alone, and every
+landscape viewport 361–639px wide rotates regardless of its own aspect: a 361 × 360 window would
+publish two columns of a 30px finger, well under the researched 45–52px floor, just because it happens
+to sit in the landscape band. The naive product is refused unless one of two things is already true:
+
+```
+gateN = floor(width / 320)                             what the raw-pixel media gate already grants
+n     = round(cols × macroCols)
+
+publish n unless (n > gateN AND width/(probe × cols) < need), in which case publish max(1, gateN)
+```
+
+In words: publish the seam's answer only where the viewport's *own* finger (measured at its current
+`cols`, through the same probe) already clears the floor, or where the raw-pixel gate would have
+matched that many columns anyway — so the attribute is never *more* aggressive than the CSS fallback
+it exists to agree with. `macroCols` is read from `.sqr-macro-pixel`'s `offsetWidth` — a `px`-based
+probe, resolved to exactly 360 or 720 regardless of the browser's default font size — divided by the
+unitless `--macro-width`, never from the `rem`-based `.sqr-macro-rem` probe: that box's pixel size is
+proportional to the default font size, and dividing it by a bare `360` only cancels cleanly when that
+default happens to be 16px.
+
+### Worked table, default ceiling (2)
+
+| viewport | probe | `cols` after ceiling | trigger | `cols` after pass | published |
+|---|---|---|---|---|---|
+| 637 × 320 | 720×360 | 1 | 637 > 384 ✓ | 1 (unit(2)=0.442 < need 0.801) | **2** — unit(1)=0.885 ≥ need |
+| 643 × 323 | 720×360 | 1 | 643 > 388 ✓ | 1 | **2** — past the raw gate already (gateN=2) |
+| 600 × 320 | 720×360 | 1 | 600 > 384 ✓ | 1 | **2** — unit(1)=0.833 ≥ need 0.813 |
+| 361 × 360 | 720×360 | 1 | 361 > 432 ✗ | 1 | **1** — unit(1)=0.501 < need 0.999, gateN=1 |
+| 358 × 278 | 360×720 (not rotated: below 361) | 1 | — | 1 | **1** |
+| 900 × 350, ceiling 4 | 360×720 | 2 | 450 > 420 ✓ | 3 (unit(3)=0.833 ≥ need 0.756) | **3** |
+
+### Why the pass is provably inert at the default ceiling of 2
+
+For the pass's own loop (not the seam's publish step) to run at all it needs `cols = 1` after the
+ceiling, the trigger true, and `unit(2) = width/(2·probe) ≥ need ≥ floor (0.6)`.
+
+- The trigger needs `width > 1.2 × height`, i.e. `a < 0.833` — landscape only.
+- Landscape, `361 ≤ width ≤ 768`: the swap gives `probe = 720`, so `unit(2) ≤ 768/1440 = 0.533 < 0.6`.
+  Refused.
+- Landscape, `width ≤ 360`: `probe = 360`, `unit(2) ≤ 0.5 < 0.6`. Refused.
+- Landscape, `width ≥ 769`: `probe = 360`, and §8's ceiling already gives `cols ≥ 2` for every
+  `width ≥ 540`, so `cols = 1` cannot be reached.
+
+No case survives, so at `data-sqr-max-cols="2"` **the pass never changes a root font-size** — the
+whole of a two-column template's behaviour change is `data-sqr-cols` catching the stylesheet up to a
+scale the solver had already chosen. See [DESIGN-RATIONALE.md](DESIGN-RATIONALE.md) for where `1.2`
+and `0.6` come from.
+
+### The stylesheet, and specificity
+
+`square-root.scss` emits every N-column rule from one mixin, twice: once under
+`@media (min-width: N × 320px)` with no `html` prefix (specificity `(0,1,0)`, byte-identical to
+0.6.0), and once under `html[data-sqr-cols="M"]` for every `M ≥ N` (specificity `(0,2,1)`) — an
+exact-match attribute selector, not `[data-sqr-cols^="…"]` or `:is(...)`, so a screen the solver
+called 3 columns still splits a `.sqr-flow-2` deck, the same "N or more" semantics `min-width` gets
+for free.
+
+| selector | specificity | wins over |
+|---|---|---|
+| `.sqr-wide-2` | (0,1,0) | — |
+| `.sqr-wide-2` inside `@media` | (0,1,0) | the base rule, on source order |
+| `html[data-sqr-cols="2"] .sqr-wide-2` | (0,2,1) | both of the above |
+| `:root[data-sqr-max-cols="1"] [class*="sqr-wide-"]` | (0,3,0) | **all** of them, and it is last in source |
+
+`data-sqr-cols` only ever *adds* rules the media gate did not already match — whenever
+`width ≥ 640` the media gate already fires, and either `probe = 360` (so `cols = round(width/360) ≥ 2`)
+or `probe = 720` (so `cols × macroCols ≥ 2`); either way the published count is at least 2. No
+viewport shows fewer columns after turning the switch on than before.
+
+### Reading the settings, and flipping them live
+
+| | attribute (wins) | custom property | default | fallback |
+|---|---|---|---|---|
+| mode | `data-sqr-short` | `--sqr-short` | `off` | anything unrecognised → `off` |
+| trigger, width ÷ height | `data-sqr-short-aspect` | `--sqr-short-aspect` | `1.2` | non-finite or ≤ 0 → 1.2 |
+| finger floor | `data-sqr-short-floor` | `--sqr-short-floor` | `0.6` | missing/empty/non-finite → 0.6; clamped 0–1 |
+| the count, written not read | `data-sqr-cols` | — | — | — |
+
+The `MutationObserver` of §10 watches the three `data-sqr-short*` attributes alongside the peek and
+fit attributes, with the same signature short-circuit. `data-sqr-cols` is deliberately absent from
+both the filter and the signature: it is this solver's *output*, and watching it would make every
+solve schedule the next one.
+
+### ⚠ What it costs
+
+**`off` costs one extra `getComputedStyle`** — `sqrShort()`, on already-clean style, no DOM write
+(the removal branch is `hasAttribute`-guarded).
+
+**`on` reads the viewport height**, so a height-only resize can change the answer — on mobile, the
+collapsing URL bar. Unlike §7.2's height modes this output is discrete: the design does not breathe
+with the bar, it flips once, only if the window sits exactly on a boundary. `window.onresize` is
+`squareRootResolve()` (the retrying entry point, §10), not the raw solver, so a resize landing
+mid-solve is queued rather than dropped.
+
+**The phone peek (§7.1) is gated on the *published* count, not the solved one.** `sqrPeekFactor()`
+only ever applied inside `cols == 1`; at 637 × 320 with the pass on, `cols` itself stays 1 (the
+pass's own loop declines — `unit(2)` is below `need`) while the seam still publishes
+`data-sqr-cols="2"`, so the deck is genuinely two full columns. Applying the peek there would shrink a
+screen with no horizontal scroll left to peek at, so the condition is `cols == 1 && published == 1`.
+With the switch off, `published` is defined to equal `cols` exactly, so this is unchanged from 0.6.0.
+
+---
+
 ## 8. Desktop: flooring to whole columns
 
 At 1024 px and up the goal changes. A desktop viewport is several canonical devices wide, and a fractional column at the right edge looks like a mistake rather than a peek. So the desktop branch **floors to a whole number of columns and then stretches to fill**:
@@ -588,14 +911,28 @@ function squareRootResolve() {
 }
 window.squareRootResolve = squareRootResolve;
 
-let sqrLastPeek = sqrPeekFactor();
+function sqrSolveSignature() {
+    const el = document.documentElement;
+    return sqrPeekFactor()
+         + '|' + (el.getAttribute('data-sqr-fit') || '')
+         + '|' + (el.getAttribute('data-sqr-stack') || '')
+         + '|' + (el.getAttribute('data-sqr-fit-floor') || '');
+}
+let sqrLastSignature = sqrSolveSignature();
 new MutationObserver(function() {
-    let now = sqrPeekFactor();
-    if (now === sqrLastPeek) return;
-    sqrLastPeek = now;
+    let now = sqrSolveSignature();
+    if (now === sqrLastSignature) return;
+    sqrLastSignature = now;
     squareRootResolve();
-}).observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-sqr-peek'] });
+}).observe(document.documentElement, { attributes: true, attributeFilter: [
+    'class', 'data-sqr-peek', 'data-sqr-fit', 'data-sqr-stack', 'data-sqr-fit-floor'
+] });
 ```
+
+Since 0.6.0 the compared value is a signature string rather than a number, because the fit mode is
+a string, and the filter carries the three `data-sqr-fit*` attributes alongside `class` and
+`data-sqr-peek` — one comparison either way, so an unrelated write to `<html>` still costs
+nothing (§7.2).
 
 Four entry points, in practice three:
 

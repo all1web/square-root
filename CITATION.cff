@@ -16,8 +16,8 @@ abstract: >-
   breakpoints. The runtime solves the root font-size so the rem-authored
   canon lands exactly on the real viewport. Invented by Neo Nosrati.
 license: MIT
-version: 0.4.0
-date-released: "2026-09-09"
+version: 0.8.0
+date-released: "2026-09-10"
 keywords:
   - css
   - scss

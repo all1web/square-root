@@ -137,8 +137,12 @@
         Resize past 640px CSS wide (2 × <code>SQR_MIN_COL_PX</code>) to see each section
         below widen from one macro column to two. Nothing reorders in the DOM either way —
         only the paint changes.
+        The second row of buttons is the 0.6.0 fit switch — it writes
+        <code>data-sqr-fit</code> on <code>&lt;html&gt;</code> and nothing else. Make the window
+        short and wide to see <code>contain</code> and <code>stack</code> part company from
+        <code>css</code>.
     </p>
-    <div style="display:flex; gap:.5rem; margin-bottom:1.25rem;">
+    <div style="display:flex; gap:.5rem; margin-bottom:.5rem;">
         <button id="btnModeRows" type="button"
                 style="font:inherit; font-weight:600; padding:.5rem 1rem; border-radius:.5rem;
                        border:1px solid #313142; background:#1d1d28; color:#e8eaf2; cursor:pointer;">
@@ -150,6 +154,25 @@
             Flow (masonry)
         </button>
         <span id="modeReadout" style="align-self:center; font:600 12px/1.6 ui-monospace, Menlo, monospace; color:#2dd4bf;"></span>
+    </div>
+
+    <div style="display:flex; gap:.5rem; margin-bottom:1.25rem; flex-wrap:wrap;">
+        <button id="btnFitCss" type="button"
+                style="font:inherit; font-weight:600; padding:.5rem 1rem; border-radius:.5rem;
+                       border:1px solid #313142; background:#2dd4bf; color:#06251f; cursor:pointer;">
+            fit: css
+        </button>
+        <button id="btnFitContain" type="button"
+                style="font:inherit; font-weight:600; padding:.5rem 1rem; border-radius:.5rem;
+                       border:1px solid #313142; background:#1d1d28; color:#e8eaf2; cursor:pointer;">
+            fit: contain
+        </button>
+        <button id="btnFitStack" type="button"
+                style="font:inherit; font-weight:600; padding:.5rem 1rem; border-radius:.5rem;
+                       border:1px solid #313142; background:#1d1d28; color:#e8eaf2; cursor:pointer;">
+            fit: stack
+        </button>
+        <span id="fitReadout" style="align-self:center; font:600 12px/1.6 ui-monospace, Menlo, monospace; color:#2dd4bf;"></span>
     </div>
 
     <section class="board2 sqr-wide-2 sqr-span-2 sqr-flow-2">
@@ -199,16 +222,62 @@
 <script type="module" src="../src/square-root.js"></script>
 
 <script>
-    // demo-only: show what the scaler decided
+    // demo-only: show what the scaler decided, and the inputs it decided from.
+    //
+    // The package exposes no solve object on purpose — its public surface is
+    // two names (window.simuating, window.squareRootResolve) and a debug global
+    // would be a third, forever. So `ratio` below is MEASURED from the root
+    // font-size the solver actually wrote, and only the inputs are mirrored.
+    // If the mirror and the measurement disagree the readout says so: a demo
+    // that lies quietly is worse than no demo.
     const readout = document.getElementById('readout');
     function report() {
+        const el    = document.documentElement;
         const probe = document.querySelector('.sqr-macro-rem');
-        const root  = getComputedStyle(document.documentElement).fontSize;
+        const rect  = probe.getBoundingClientRect();
+        const root  = getComputedStyle(el).fontSize;
+        const ratio = parseFloat(root) / 16;            // ground truth: what the solver wrote
+        const pw    = rect.width  / ratio;              // the probe at the 100% reset
+        const ph    = rect.height / ratio;
+
+        // ---- demo-only mirror of the package arithmetic (peek is off here) ----
+        const fit   = (el.getAttribute('data-sqr-fit') || 'css').toLowerCase();
+        const stack = parseFloat(el.getAttribute('data-sqr-stack')) > 0
+                    ? parseFloat(el.getAttribute('data-sqr-stack')) : 9;
+        const fRaw  = el.getAttribute('data-sqr-fit-floor');
+        const floor = (fRaw === null || fRaw === '' || !isFinite(parseFloat(fRaw)))
+                    ? 0.7 : Math.min(1, Math.max(0, parseFloat(fRaw)));
+        const maxCols = parseFloat(el.getAttribute('data-sqr-max-cols')) > 0
+                      ? parseFloat(el.getAttribute('data-sqr-max-cols')) : 2;
+        let cols = 1;
+        if (innerWidth > 640 && innerWidth < 768)       cols = 1.2;
+        else if (innerWidth >= 768 && innerWidth < 1024) cols = 1.61;
+        if (cols > maxCols) cols = maxCols;
+        if (innerWidth >= 640) {
+            cols = Math.max(1, Math.min(maxCols, Math.round(innerWidth / pw)));
+            if (innerWidth / cols < 320) cols = Math.max(1, cols - 1);
+        }
+        const vh     = el.clientHeight || innerHeight;
+        const units  = (pw > ph) ? 6 : 12;              // simplified: the package compares aspects
+        const ratioW = innerWidth / pw / cols;
+        const budget = (fit === 'stack') ? ph * Math.min(1, stack / units) : ph;
+        const ratioH = (fit === 'css') ? Infinity : vh / budget;
+        const mirror = Math.max(Math.min(ratioW, ratioH), floor * ratioW);
+        const agree  = Math.abs(mirror - ratio) / ratio < 0.005;
+
         readout.innerHTML =
-            `viewport ${innerWidth}×${innerHeight}` +
+            `viewport ${innerWidth}×${vh}` +
             ` &nbsp;|&nbsp; root ${root}` +
-            ` &nbsp;|&nbsp; canon spans ${Math.round(probe.getBoundingClientRect().width)}px` +
-            ` <span class="hint">(= viewport ÷ column count; one column on a phone)</span>`;
+            ` &nbsp;|&nbsp; fit ${fit}` +
+            ` &nbsp;|&nbsp; stack ${stack}u` +
+            ` &nbsp;|&nbsp; floor ${floor}` +
+            ` &nbsp;|&nbsp; probe ${Math.round(pw)}×${Math.round(ph)}` +
+            ` &nbsp;|&nbsp; cols ${cols}` +
+            ` &nbsp;|&nbsp; ratioW ${ratioW.toFixed(4)}` +
+            ` &nbsp;|&nbsp; ratioH ${isFinite(ratioH) ? ratioH.toFixed(4) : '∞'}` +
+            ` &nbsp;|&nbsp; ratio ${ratio.toFixed(4)} ${agree ? '✓' : '✗ mirror ' + mirror.toFixed(4)}` +
+            ` &nbsp;|&nbsp; canon spans ${Math.round(rect.width)}px` +
+            ` <span class="hint">(= viewport ÷ column count, unless height binds)</span>`;
     }
     addEventListener('resize', () => setTimeout(report, 1200));
     setTimeout(report, 1200);
@@ -232,6 +301,33 @@
     btnRows.addEventListener('click', () => setMode('rows'));
     btnFlow.addEventListener('click', () => setMode('flow'));
     setMode('flow'); // starting mode for the demo
+
+    // demo-only: the fit switch (0.6.0). These buttons only WRITE the attribute
+    // on <html>; the package's own MutationObserver notices and re-solves.
+    // Nothing here calls the solver — that is the point of the observer.
+    const btnFit = {
+        css:     document.getElementById('btnFitCss'),
+        contain: document.getElementById('btnFitContain'),
+        stack:   document.getElementById('btnFitStack')
+    };
+    const fitReadout = document.getElementById('fitReadout');
+    function setFit(mode) {
+        // 'css' REMOVES the attribute instead of writing data-sqr-fit="css".
+        // The two are equivalent by design, and the demo should sit in the
+        // attribute-ABSENT state by default, because that is the state the
+        // byte-identical claim is about. It also exercises the removeAttribute
+        // path the README documents.
+        if (mode === 'css') html.removeAttribute('data-sqr-fit');
+        else                html.setAttribute('data-sqr-fit', mode);
+        for (const k in btnFit) {
+            btnFit[k].style.background = (k === mode) ? '#2dd4bf' : '#1d1d28';
+            btnFit[k].style.color      = (k === mode) ? '#06251f' : '#e8eaf2';
+        }
+        fitReadout.textContent = `data-sqr-fit="${mode}" — the solve takes about a second`;
+        setTimeout(report, 1400);
+    }
+    for (const k in btnFit) btnFit[k].addEventListener('click', () => setFit(k));
+    setFit('css');   // the package default: no attribute at all
 </script>
 
 </body>

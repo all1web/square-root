@@ -386,7 +386,7 @@ The class goes on `<html>`. The factor is clamped to `0.5 … 1.0` and falls bac
 
 **It only applies to phones.** The multiplication sits inside `if (cols == 1)`, so it affects widths up to 640px and nothing else. On `md`, `lg` and `xl` the class is inert.
 
-**Flip it live, no reload.** A `MutationObserver` on `<html>` (filtered to `class` and `data-sqr-peek`, and short-circuited when the resulting factor is unchanged) re-solves on its own:
+**Flip it live, no reload.** A `MutationObserver` on `<html>` (filtered to `class`, `data-sqr-peek` and, since 0.6.0, the three `data-sqr-fit*` attributes, and short-circuited when the resulting inputs are unchanged) re-solves on its own:
 
 ```js
 document.documentElement.classList.toggle('sqr-peek');   // paste into the console
@@ -420,6 +420,310 @@ if (!el || el.classList.contains('full-screen')) return 1;
 ```
 
 Full detail, including the guard table and the tappability note: **[docs/HOW-IT-WORKS.md §7.1](docs/HOW-IT-WORKS.md)**.
+
+---
+
+## The fit switch (`data-sqr-fit`)
+
+*New in 0.6.0. **Off by default** — the default mode is the 0.5.0 solve, to the digit.*
+
+The headline solve fits the canon to the viewport **width**. That is right on a phone, where the
+screen is always taller than it is wide. It is not always right on a square screen, a landscape
+phone, or a 16:9 laptop, where the design can end up taller than the window. `square-root.scss`
+already answers part of this in CSS — the landscape media query rotates the canon to 720 × 360
+between 361px and 768px — and this switch is the other half, for the screens that query
+deliberately excludes.
+
+```html
+<html>                                    <!-- css     (default): width only, 0.5.0 exactly -->
+<html data-sqr-fit="contain">             <!-- contain: the whole canon fits in BOTH axes -->
+<html data-sqr-fit="stack">               <!-- stack:   9 finger units of height must fit -->
+<html data-sqr-fit="stack" data-sqr-stack="7">        <!-- a 7-unit budget instead -->
+<html data-sqr-fit="contain" data-sqr-fit-floor="0.6"><!-- allow a deeper shrink -->
+```
+
+| mode | what it guarantees | binds when |
+|---|---|---|
+| `css` | nothing about height. The design may be taller than the window; the page scrolls. | never |
+| `contain` | the canonical device fits the viewport in both axes | viewport aspect `H/W < (probe height / probe width) / cols`. With the portrait canon that is `2/cols` — any landscape screen once two columns are on it; halve it where the landscape media query has rotated the probe |
+| `stack` | `data-sqr-stack` finger units of height fit (default **9** of the canon's 12), never more than the canon itself | wider than 4:3, with the defaults |
+
+The three modes are ordered at every viewport: **`css` ≥ `stack` ≥ `contain`.** `css` is always the
+largest scale, `contain` always the smallest.
+
+**Settings.** Each reads the attribute on `<html>` first, then the custom property on `:root`, then
+the default — the same order as `data-sqr-max-cols`.
+
+| | attribute | custom property | default |
+|---|---|---|---|
+| mode | `data-sqr-fit` | `--sqr-fit` | `css` |
+| height budget, in finger units | `data-sqr-stack` | `--sqr-stack` | `9` |
+| floor | `data-sqr-fit-floor` | `--sqr-fit-floor` | `0.7` (clamped 0–1; `0` = no floor) |
+
+**The floor** is what stops a short wide window collapsing the design: the height solve may never
+take the scale below `0.7 ×` what the width solve asked for. On a 1366 × 768 laptop, `contain`
+would like to shrink the canon to 56% of the width solve; the floor holds it at 70% and the page
+scrolls the rest. `0.7` is not a round number — it is the midpoint of a window closed at one end by
+the 45px touch floor and at the other by the 4:3 tablet. See
+[docs/DESIGN-RATIONALE.md](docs/DESIGN-RATIONALE.md).
+
+**Flip it live, no reload.** The same `MutationObserver` that watches the peek watches these three
+attributes, with the same short-circuit:
+
+```js
+document.documentElement.dataset.sqrFit = 'contain';   // paste into the console
+document.documentElement.dataset.sqrStack = '7';       // retune the budget
+document.documentElement.removeAttribute('data-sqr-fit');   // back to the default
+```
+
+The **custom properties are not observed** — they are the server-rendered channel, exactly like
+`--sqr-max-cols`. Change one and call `window.squareRootResolve()`.
+
+### ⚠ What each mode costs you
+
+**`css` costs nothing.** It is the 0.5.0 solve, unchanged, and it is what you get if you never touch
+this feature. An upgrade to 0.6.0 does not move a digit.
+
+**`contain` and `stack` break the headline invariant**, the same one the peek breaks — with the
+canon fitted to the height, it no longer spans the width, so `sqr-w-6` is not full-bleed and neither
+is anything else built on the canon. Unlike the peek, the amount is not a fixed factor you chose; it
+depends on the viewport's aspect, so the same page gives up a different share of the width on
+different screens.
+
+| viewport | mode | root px | canon on screen | bare width |
+|---|---|---|---|---|
+| 1024 × 768 | `css` | 22.756 | 2 × 512 = 1024px | 0 |
+| 1024 × 768 | `contain` | 17.067 | 2 × 384 = 768px | 256px (25%) |
+| 1024 × 768 | `stack` | 22.756 | 2 × 512 = 1024px | 0 — stack is free at 4:3 |
+| 1366 × 768 | `css` | 30.356 | 2 × 683 = 1366px | 0 |
+| 1366 × 768 | `contain` | 21.249 | 2 × 478 = 956px | 410px (30%) — and the canon *still* does not fit; that is the floor |
+| 1366 × 768 | `stack` | 22.756 | 2 × 512 = 1024px | 342px (25%) |
+
+**The height modes re-solve on a height-only resize.** `onresize` fires when only the height
+changes, and in `css` mode that lands on the same number so nothing moves. In `contain` and `stack`
+it rescales the whole page. On a mobile browser the collapsing URL bar is a height-only resize of
+60–100px, so a height mode on a long scrolling document makes the design breathe while the reader
+scrolls. **Nothing damps this.** The height is read from `documentElement.clientHeight`, the root
+element's own content height, and a URL-bar collapse moves that exactly as it moves
+`window.innerHeight`. (`clientHeight` is used because it is the conservative number: where it
+differs from `100vh` it is the smaller, having excluded a classic horizontal scrollbar — and this
+framework's boards are horizontal scrollers.) The mitigation is placement, not arithmetic: **put a
+height mode on a board that owns the viewport** — a `height: 100vh` snap column — not on a document
+that scrolls.
+
+**A guarantee can be unachievable, and the floor wins when it is.** On an 812 × 375 landscape phone
+(past the SCSS swap's 768px bound, so the canon is still portrait), nine finger units of height need
+41.7px each — under the researched 45px floor. Neither height mode can deliver there. Both clamp to
+the floor and the page scrolls, which is the honest answer.
+
+**Off the wide screens, all three modes are identical.** On every portrait phone, on the Fold in
+both orientations, and on any rotated phone the SCSS swap covers, the height never binds and the
+solved root is the `css` number exactly.
+
+Full detail, including the eight-viewport worked table:
+**[docs/HOW-IT-WORKS.md §7.2](docs/HOW-IT-WORKS.md)**.
+
+---
+
+## Short screens (`data-sqr-short`)
+
+*New in 0.7.0. **On by default** (the owner's call, 2026-09-10: the rule is the framework's own logic,
+finger and aspect, and it only changes screens the width-only solve gets wrong). `data-sqr-short="off"`
+restores the 0.6.0 solve to the digit, and with it off nothing is written to `<html>`.*
+
+The width solve says how big the design is. It does not say how many columns the screen should show
+— that is the ceiling (`data-sqr-max-cols`, 0.3.0), and the ceiling only ever asks how WIDE a column
+is. On a short wide window a single column can be wide enough to pass the ceiling and still be
+wrong: one card lies across the whole screen and the fold has no room left.
+
+There is a second half to the problem, and it is the one that bites first. The N-column rules in
+`square-root.scss` are gated on `@media (min-width: N × 320px)` — **raw** pixels, resolved against
+the initial 16px root. The solver measures against the probe. Where the landscape media query has
+rotated the canon to 720 × 360, those two answers disagree: a 637 × 320 window is already two macro
+columns wide to the solver, and three pixels short of the gate to the stylesheet. Turn this switch
+on and the solver publishes its answer as `data-sqr-cols` on `<html>`, and the stylesheet follows it.
+
+```html
+<html>                                                  <!-- on (default) -->
+<html data-sqr-short="off">                             <!-- off: the 0.6.0 solve -->
+<html data-sqr-short="cols">                            <!-- on, said out loud -->
+<html data-sqr-short="cols" data-sqr-short-aspect="1.4"><!-- a lazier trigger -->
+<html data-sqr-short="cols" data-sqr-short-floor="0.75"><!-- demand a 45px finger at any aspect -->
+:root { --sqr-short: cols }                             <!-- the same, server-rendered -->
+```
+
+| mode | what it does | binds when |
+|---|---|---|
+| `off` | nothing. No attribute is written and no `html[data-sqr-cols]` rule can match. | never |
+| `cols` | publishes the solved macro-column count as `data-sqr-cols`, and adds a column while the screen is short for it and the finger holds | `width / cols > height × aspect`, and only then if the next finger clears the floor |
+
+**The rule, in one line.** While a column is wider than `aspect` times the viewport height, accept
+one more column if the finger it would leave is still at least
+`floor + (1 − floor) × min(1, height/width)` of a canonical finger. **Inside this pass the finger
+floor replaces the fixed 320px column floor** — a 300px column at a 50px finger is a column; a 300px
+column at a 30px finger is not.
+
+**The published attribute is floor-gated, not the pass's raw product.** `data-sqr-cols` is not simply
+"the solved column count times the probe's macro-column span" — that product reflects the landscape
+probe's rotation alone, and every landscape viewport 361–639px wide rotates regardless of its own
+aspect. It publishes the naive count only where the viewport's own finger, measured through the
+rotated probe, already clears the floor, or where the raw-pixel media gate would have matched that
+many columns anyway. A 361 × 360 window (a 30px finger either way) is not offered a second column;
+a 637 × 320 window (a 53px finger) is — that distinction is the whole feature.
+
+**Settings.** Each reads the attribute on `<html>` first, then the custom property on `:root`, then
+the default — the same order as `data-sqr-max-cols` and `data-sqr-fit`.
+
+| | attribute | custom property | default |
+|---|---|---|---|
+| mode | `data-sqr-short` | `--sqr-short` | `cols` (on; `off` opts out) |
+| trigger, column width ÷ height | `data-sqr-short-aspect` | `--sqr-short-aspect` | `1.2` |
+| finger floor at a flat screen | `data-sqr-short-floor` | `--sqr-short-floor` | `0.6` (clamped 0–1; `1` = pass disabled) |
+| the count, **written not read** | `data-sqr-cols` | — | — |
+
+**Worked answers**, at the default ceiling of 2:
+
+| viewport | probe | today | with the switch on | finger |
+|---|---|---|---|---|
+| 637 × 320 | 720 × 360 (rotated) | 1 column — 3px short of the 40rem gate | **2 columns of 318.5** | 53.08px, unchanged |
+| 643 × 323 | 720 × 360 | 2 columns (past the gate) | 2 columns | 53.58px, unchanged |
+| 600 × 320 | 720 × 360 | 1 column | **2 columns of 300** | 50.00px, unchanged |
+| 361 × 360 | 720 × 360 | 1 column | 1 column — the finger would be a 30px half-finger | 30.08px |
+| 358 × 278 | 360 × 720 | 1 column | 1 column — the finger would be half a finger | 59.67px |
+| 451 × 775 | 360 × 720 | 1 column | 1 column — not short | 75.17px |
+| 900 × 350, ceiling 4 | 360 × 720 | 2 columns of 450 | **3 columns of 300** | 75 → 50px |
+
+**Flip it live, no reload.** The same `MutationObserver` that watches the peek and the fit
+attributes watches these three:
+
+```js
+document.documentElement.dataset.sqrShort = 'cols';         // paste into the console
+document.documentElement.dataset.sqrShortAspect = '1.4';    // retune the trigger
+document.documentElement.removeAttribute('data-sqr-short'); // back to the default
+```
+
+`data-sqr-cols` is the one attribute here the observer does **not** watch — it is the solver's own
+output, and watching it would make every solve schedule the next one.
+
+### ⚠ What this costs you
+
+**`off` costs nothing.** No height read, no attribute written, no rule matched. One extra
+`getComputedStyle` on `<html>` per solve, which is a style read on already-clean style.
+
+**On, it reads the viewport height** — so a height-only resize can now change the answer. On mobile
+that means the collapsing URL bar. Unlike the fit modes this output is discrete, so the design does
+not breathe with the bar; it flips, once, and only if the window is sitting exactly on a boundary.
+Pick an `aspect` you are not living on. `window.onresize` is `squareRootResolve()` (not the raw
+solver), so a resize landing mid-solve is retried rather than dropped — with the raw solver a dropped
+resize on a foldable could otherwise strand a stale, too-wide column layout.
+
+**At a ceiling of 2 the pass cannot fire at all** — the arithmetic is in
+[docs/DESIGN-RATIONALE.md](docs/DESIGN-RATIONALE.md). On a two-column template the switch is
+purely the seam: the solved scale is untouched at every viewport and only the column gate moves.
+
+**A wider screen never loses a column.** `data-sqr-cols` only ever adds rules to the ones the media
+gate already matched.
+
+**The phone peek is gated on the published count, not just the solved one.** With `sqr-peek` on, a
+screen where the seam has published a second column no longer applies the peek's shrink — the peek
+is a one-column horizontal-scroll affordance, and a genuinely two-column screen has nothing to peek
+at.
+
+Full detail, including the specificity table and the compiled selectors:
+**[docs/HOW-IT-WORKS.md §7.3](docs/HOW-IT-WORKS.md)**.
+
+---
+
+## Device tiers (`data-sqr-device-cols`)
+
+*New in 0.8.0. **Off by default** — the owner's own call: the mechanism belongs in the package, the
+numbers belong to the site. With it off the 0.7.0 solve is untouched to the digit and nothing is read
+beyond the switch itself.*
+
+`data-sqr-short` (0.7.0) asks whether a window is **short** for its column — its shape. This asks
+whether it is **big** — its raw pixel budget — and that is the question the aspect can never answer.
+A Fold split at 637 × 727 CSS is aspect 1.14, genuinely portrait, nowhere near the short trigger, and
+it is 1672 × 1908 real pixels being asked to carry one 637px column at 1.77× the canon.
+
+```html
+<html>                                                       <!-- off (default) -->
+<html data-sqr-device-cols="tiers"
+      data-sqr-device-tiers="2 1600 1700 1.75">              <!-- two columns on a big dense window -->
+<html data-sqr-device-cols="tiers" data-sqr-max-cols="3"
+      data-sqr-device-tiers="2 1600 1700 1.75, 3 … … …">     <!-- a tablet tier needs the ceiling too -->
+:root { --sqr-device-cols: tiers }                            <!-- the same, server-rendered -->
+```
+
+**The table.** One row per tier, four numbers, rows separated by commas:
+
+| field | means |
+|---|---|
+| `cols` | how many columns this tier asks for (2 or more, and never more than `data-sqr-max-cols` — a row asking for more than the ceiling allows is dropped, not clamped to it) |
+| `minShortPx` | the **shorter** viewport edge, in device pixels (`min(w,h) × devicePixelRatio`) |
+| `minLongPx` | the **longer** one. The pair is sorted, so rotation does not flip the answer |
+| `minScale` | the scale the earlier passes already solved, `width / (probe × cols)` |
+
+**All four must hold**, and the highest qualifying tier wins. A tier can only add columns, never
+remove one, and never out-rank `data-sqr-max-cols`. Every field is validated before a row is used: a
+wrong field count, a non-number, a `cols` under 2, or a threshold that is not a positive number drops
+that one row and leaves the rest of the table working.
+
+**Choose `minScale` as a finger, not as a scale.** A 1 → 2 promotion halves the solved scale, so the
+finger it leaves is exactly `30 × minScale` px; a 2 → 3 promotion leaves `40 × minScale`.
+
+| `minScale` | finger left by a 1 → 2 promotion | |
+|---|---|---|
+| 2.00 | 60.0px | a whole canonical finger |
+| **1.75** | **52.5px** | the ALL1 number |
+| 1.50 | 45.0px | exactly the researched touch floor |
+| 1.25 | 37.5px | below the floor — don't |
+
+**Settings.** Each reads the attribute on `<html>` first, then the custom property on `:root`, then
+the default — the same order as `data-sqr-max-cols`, `data-sqr-fit` and `data-sqr-short`.
+
+| | attribute | custom property | default |
+|---|---|---|---|
+| mode | `data-sqr-device-cols` | `--sqr-device-cols` | `off` (`tiers` opts in) |
+| the tier table | `data-sqr-device-tiers` | `--sqr-device-tiers` | empty — an empty table is inert |
+| the ceiling a tier cannot pass | `data-sqr-max-cols` | `--sqr-max-cols` | `2` |
+
+**Worked answers**, with `2 1600 1700 1.75` and the default ceiling of 2:
+
+| viewport | DPR | device px | scale | result | finger |
+|---|---|---|---|---|---|
+| 637 × 727 | 2.625 | 1672 × 1908 | 1.7694 | **2 columns of 318.5** | 106.2 → 53.08px |
+| 637 × 727 | 2.35 | 1497 × 1708 | 1.7694 | 1 column — short edge under 1600 | 106.17px |
+| 600 × 760 | 2.70 | 1620 × 2052 | 1.6667 | 1 column — scale under 1.75 | 100.00px |
+| 500 × 727 | 2.625 | 1313 × 1908 | 1.3889 | 1 column — narrow the split, it falls back | 83.33px |
+| 375 × 812 | 3 | 1125 × 2436 | 1.0417 | 1 column — a phone is a phone | 62.50px |
+| 708 × 823 | 2.625 | 1859 × 2160 | 0.9833 | 2 columns, from the 0.3.0 ceiling — this pass declines | 59.00px |
+
+**Flip it live, no reload.** The observer watches both attributes, with the same short-circuit:
+
+```js
+document.documentElement.dataset.sqrDeviceCols = 'tiers';
+document.documentElement.dataset.sqrDeviceTiers = '2 1600 1700 1.5';
+document.documentElement.removeAttribute('data-sqr-device-cols');   // back to the default
+```
+
+### ⚠ What this costs you
+
+**`off` costs nothing.** One `getComputedStyle` on `<html>` per solve — a style read on already-clean
+style. No height read, no attribute written, no rule matched, no CSS added by this release at all.
+
+**On, it reads the viewport height**, so a height-only resize can change the answer — on mobile, the
+collapsing URL bar. Leave the long edge real headroom: a 60–100 CSS px collapse is 160–260 device
+pixels, and a threshold sitting just under your live reading will flip the layout mid-scroll. In
+portrait the **short** edge is the load-bearing half and does not move with the bar; set the long one
+low enough to stay clear.
+
+**It moves the cliff, it does not remove it.** Column counts are integers, so somewhere one CSS pixel
+still doubles the finger. With ALL1's own row that boundary moves from 640 to 630, on screens dense
+enough to deserve it.
+
+**A tablet tier needs the ceiling raised too.** `data-sqr-max-cols` defaults to 2 and clamps every
+tier; a `3 …` row without `data-sqr-max-cols="3"` is now dropped rather than silently clamped to 2 —
+the ceiling still has to be raised for the row to do anything at all.
 
 ---
 

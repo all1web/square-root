@@ -135,7 +135,16 @@ module.exports = plugin(function ({ addBase, addComponents, addUtilities, matchU
      Gate derived from the package's own constants: a column is not a column
      below SQR_MIN_COL_PX (320) — square-root.js — so N columns need N*320px,
      i.e. N*20rem against the INITIAL 16px root (media queries never see the
-     solved root; that is what keeps the gate stable). */
+     solved root; that is what keeps the gate stable).
+
+     0.7.0: also mirrored under html[data-sqr-cols="M"] for every M >= n — see
+     the loop below the @media block. PRE-EXISTING DRIFT FIXED IN THIS RELEASE
+     (found during 0.7.0 review, docs/plans/short-screens-design.md §2.2): the
+     0.6.0 gutter change (minmax(0, 1fr), column-gap: 0, the 0.25u
+     padding-inline) reached src/square-root.scss but never this file. Three
+     drifts, six rules -- grid-template-columns, column-gap (twice) and the
+     missing padding-inline (twice) -- fixed here so npm run verify:plugin is
+     green against the 0.6.0 SCSS as well as the 0.7.0 attribute block. */
   const spanning = {};
   for (let n = 2; n <= 4; n++) {
     spanning[`.sqr-wide-${n}`] = { width: unit(6) };
@@ -145,10 +154,11 @@ module.exports = plugin(function ({ addBase, addComponents, addUtilities, matchU
       /* MODE A — aligned rows: cards alternate in document order. */
       [`html.sqr-mode-rows .sqr-span-${n}`]: {
         display: 'grid',
-        'grid-template-columns': `repeat(${n}, 1fr)`,
+        'grid-template-columns': `repeat(${n}, minmax(0, 1fr))`,
         'grid-auto-flow': 'row',
-        'column-gap': unit(1),
+        'column-gap': '0',
         'align-content': 'start',
+        'padding-inline': unit(0.25),
       },
       [`html.sqr-mode-rows .sqr-span-${n} > .sqr-row`]: { 'grid-column': '1 / -1' },
       /* MODE B — masonry fill: multi-column IS the masonry; block because
@@ -156,14 +166,45 @@ module.exports = plugin(function ({ addBase, addComponents, addUtilities, matchU
       [`html.sqr-mode-flow .sqr-flow-${n}`]: {
         display: 'block',
         'column-count': `${n}`,
-        'column-gap': unit(1),
+        'column-gap': '0',
         'column-fill': 'balance',
+        'padding-inline': unit(0.25),
       },
       [`html.sqr-mode-flow .sqr-flow-${n} > *`]: { 'break-inside': 'avoid' },
       [`html.sqr-mode-flow .sqr-flow-${n} > .sqr-row`]: { 'column-span': 'all' },
       [`html.sqr-mode-rows .sqr-span-${n} > .sqr-left`]: { 'grid-column': '1' },
       [`html.sqr-mode-rows .sqr-span-${n} > .sqr-right`]: { 'grid-column': '2' },
     };
+
+    /* GATE 2 — WHAT THE SOLVER SOLVED (0.7.0), mirroring
+       square-root.scss's `@for $m from $n through 4 { @include
+       sqr-n-columns($n, '[data-sqr-cols="#{$m}"]'); }`. One block per count
+       that CONTAINS n, exact-match attribute selectors (no @media wrapper —
+       the attribute is the gate). */
+    for (let m = n; m <= 4; m++) {
+      const at = `html[data-sqr-cols="${m}"]`;
+      spanning[`${at} .sqr-wide-${n}`] = { width: unit(6 * n) };
+      spanning[`${at}.sqr-mode-rows .sqr-span-${n}`] = {
+        display: 'grid',
+        'grid-template-columns': `repeat(${n}, minmax(0, 1fr))`,
+        'grid-auto-flow': 'row',
+        'column-gap': '0',
+        'align-content': 'start',
+        'padding-inline': unit(0.25),
+      };
+      spanning[`${at}.sqr-mode-rows .sqr-span-${n} > .sqr-row`] = { 'grid-column': '1 / -1' };
+      spanning[`${at}.sqr-mode-flow .sqr-flow-${n}`] = {
+        display: 'block',
+        'column-count': `${n}`,
+        'column-gap': '0',
+        'column-fill': 'balance',
+        'padding-inline': unit(0.25),
+      };
+      spanning[`${at}.sqr-mode-flow .sqr-flow-${n} > *`] = { 'break-inside': 'avoid' };
+      spanning[`${at}.sqr-mode-flow .sqr-flow-${n} > .sqr-row`] = { 'column-span': 'all' };
+      spanning[`${at}.sqr-mode-rows .sqr-span-${n} > .sqr-left`] = { 'grid-column': '1' };
+      spanning[`${at}.sqr-mode-rows .sqr-span-${n} > .sqr-right`] = { 'grid-column': '2' };
+    }
   }
   addComponents(spanning);
 });

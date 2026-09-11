@@ -153,6 +153,66 @@
 $sqr-min-col: 320;
 $sqr-macro-units: 6;      /* --macro-width / --micro-width */
 
+/* THE N-COLUMN RULES, ONCE. Emitted under two gates that ask the same
+   question at two scales -- Correspondence, and the reason 0.7.0 exists:
+
+     @media (min-width: N*320px)   the no-JS fallback, raw pixels
+     html[data-sqr-cols="N"]       what the SOLVER actually solved
+
+   $at is the attribute the selector carries: '' under the media gate, so the
+   compiled selectors there are byte-identical to 0.6.0's; '[data-sqr-cols=…]'
+   under the attribute gate, where it lands ON the html element rather than
+   before it -- html[data-sqr-cols="2"].sqr-mode-rows is one element with an
+   attribute and a class, never `html … html`. */
+@mixin sqr-n-columns($n, $at: '') {
+
+    /* WIDTH — the section itself. Below both gates it is one macro column,
+       byte-identical to .sqr-w-6. Under the media gate the selector carries no
+       html prefix at all, so its specificity stays (0,1,0) exactly as it was;
+       adding a descendant `html ` there would have quietly outranked host
+       overrides that beat it today. */
+    @if $at == '' {
+        .sqr-wide-#{$n} { width: calc(var(--micro-width) * #{$sqr-macro-units * $n} * 0.0625rem); }
+    } @else {
+        html#{$at} .sqr-wide-#{$n} { width: calc(var(--micro-width) * #{$sqr-macro-units * $n} * 0.0625rem); }
+    }
+
+    /* MODE A — ALIGNED ROWS. Cards alternate in document order
+       (1 left, 2 right, 3 left …) because that is what grid-auto-flow
+       row does; nothing is reordered, the DOM is untouched. */
+    html#{$at}.sqr-mode-rows .sqr-span-#{$n} {
+        display: grid;
+        grid-template-columns: repeat(#{$n}, minmax(0, 1fr));   /* minmax(0,…): a bare 1fr keeps an auto min-content floor, so one wide card pushed the second column off the Fold (owner, 2026-09-09 05:20) */
+        grid-auto-flow: row;
+        column-gap: 0;   /* the cards carry their own side margins; a 1u gap on top of them put 90px between the columns and 16px at the edges (owner, 2026-09-09 06:20) */
+        align-content: start;
+        padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);   /* the edges match the middle: two card margins meet between columns (0.5u), so the deck adds 0.25u at each edge */
+    }
+    html#{$at}.sqr-mode-rows .sqr-span-#{$n} > .sqr-row { grid-column: 1 / -1; }
+
+    /* MODE B — MASONRY FILL. Native grid masonry is not shipped on
+       Android Chrome, so multi-column IS the masonry. No JS, ever:
+       a JS masonry breaks Livewire morphs and scroll snap. */
+    html#{$at}.sqr-mode-flow .sqr-flow-#{$n} {
+        /* block, for the same reason MODE A states grid: multi-column is
+           only honoured on a block container, so a deck that is a flex row
+           on the phone -- or anything a host stylesheet made it -- would
+           silently stay one column here while MODE A worked. The two modes
+           answer the same markup, so each states the display it needs. */
+        display: block;
+        column-count: #{$n};
+        column-gap: 0;   /* the cards carry their own side margins; a 1u gap on top of them put 90px between the columns and 16px at the edges (owner, 2026-09-09 06:20) */
+        column-fill: balance;
+        padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);   /* the edges match the middle (0.5u) */
+    }
+    html#{$at}.sqr-mode-flow .sqr-flow-#{$n} > * { break-inside: avoid; }
+    html#{$at}.sqr-mode-flow .sqr-flow-#{$n} > .sqr-row { column-span: all; }
+
+    /* per-card pin — a utility on the card, never a layout fork */
+    html#{$at}.sqr-mode-rows .sqr-span-#{$n} > .sqr-left  { grid-column: 1; }
+    html#{$at}.sqr-mode-rows .sqr-span-#{$n} > .sqr-right { grid-column: 2; }
+}
+
 @for $n from 2 through 4 {
     $gate: $n * $sqr-min-col * 0.0625rem;  /* = N*320/16 — 0.0625 is the house 1/16 */
 
@@ -160,41 +220,21 @@ $sqr-macro-units: 6;      /* --macro-width / --micro-width */
        byte-identical to .sqr-w-6. */
     .sqr-wide-#{$n} { width: calc(var(--micro-width) * #{$sqr-macro-units} * 0.0625rem); }
 
+    /* GATE 1 — RAW PIXELS (0.4.0, unchanged). The fallback for a page whose
+       JS has not solved yet, or is not running at all. */
     @media (min-width: #{$gate}) {
-        .sqr-wide-#{$n} { width: calc(var(--micro-width) * #{$sqr-macro-units * $n} * 0.0625rem); }
+        @include sqr-n-columns($n);
+    }
 
-        /* MODE A — ALIGNED ROWS. Cards alternate in document order
-           (1 left, 2 right, 3 left …) because that is what grid-auto-flow
-           row does; nothing is reordered, the DOM is untouched. */
-        html.sqr-mode-rows .sqr-span-#{$n} {
-            display: grid;
-            grid-template-columns: repeat(#{$n}, 1fr);
-            grid-auto-flow: row;
-            column-gap: calc(var(--micro-width) * 0.0625rem);
-            align-content: start;
-        }
-        html.sqr-mode-rows .sqr-span-#{$n} > .sqr-row { grid-column: 1 / -1; }
-
-        /* MODE B — MASONRY FILL. Native grid masonry is not shipped on
-           Android Chrome, so multi-column IS the masonry. No JS, ever:
-           a JS masonry breaks Livewire morphs and scroll snap. */
-        html.sqr-mode-flow .sqr-flow-#{$n} {
-            /* block, for the same reason MODE A states grid: multi-column is
-               only honoured on a block container, so a deck that is a flex row
-               on the phone -- or anything a host stylesheet made it -- would
-               silently stay one column here while MODE A worked. The two modes
-               answer the same markup, so each states the display it needs. */
-            display: block;
-            column-count: #{$n};
-            column-gap: calc(var(--micro-width) * 0.0625rem);
-            column-fill: balance;
-        }
-        html.sqr-mode-flow .sqr-flow-#{$n} > * { break-inside: avoid; }
-        html.sqr-mode-flow .sqr-flow-#{$n} > .sqr-row { column-span: all; }
-
-        /* per-card pin — a utility on the card, never a layout fork */
-        html.sqr-mode-rows .sqr-span-#{$n} > .sqr-left  { grid-column: 1; }
-        html.sqr-mode-rows .sqr-span-#{$n} > .sqr-right { grid-column: 2; }
+    /* GATE 2 — WHAT THE SOLVER SOLVED (0.7.0). One include per count that
+       CONTAINS n, because a screen the solver called 3 columns must still
+       split a .sqr-flow-2 deck — the same "N or more" semantics the media
+       gates get for free from min-width (80rem satisfies 40rem), spelled out.
+       Exact-match selectors, so specificity is (0,2,1) and nothing new enters
+       the cascade: no :is(), no new selector feature, and the ceiling rule
+       below at (0,3,0) still wins on specificity as well as source order. */
+    @for $m from $n through 4 {
+        @include sqr-n-columns($n, '[data-sqr-cols="#{$m}"]');
     }
 }
 
