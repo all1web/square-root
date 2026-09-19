@@ -55,12 +55,33 @@ const SQR_MAX_COLS_VAR     = '--sqr-max-cols';
 const SQR_MAX_COLS_DEFAULT = 2;
 const SQR_MIN_COL_PX       = 320;   // a column narrower than this is not a column
 
+/* NO CEILING BY CHOICE (0.9.1). Owner's ruling, 2026-09-19 03:50 ET, on
+   docs/desktop-side.md §4(4): "With Square Root I don't care if it turns
+   into 8 columns if it's a TV and fits right. I need it to never get that
+   fat -- I am sure there is some intelligent algorithm." The algorithm was
+   already here: cols = round(width / macro), clamped to a minimum column
+   width of SQR_MIN_COL_PX. That is what keeps the finger inside its band --
+   the COUNT absorbs the width, never the unit -- so the only thing "no
+   ceiling" needs is a maxCols that never clamps: Infinity. Every existing
+   comparison downstream (Math.min/Math.floor/`>` against maxCols) already
+   behaves correctly against Infinity, so this is the one place that changes.
+   Numeric ceilings are untouched -- this is additive, and the default stays
+   the numeric 2 it always was.
+
+     <html>                                     ceiling 2 (default)
+     <html data-sqr-max-cols="4">               ceiling 4
+     <html data-sqr-max-cols="auto">            no ceiling: cols = round(w / macro)
+     :root { --sqr-max-cols: auto }             no ceiling (the attribute wins) */
+function sqrParseMaxCols(raw) {
+    if (raw === null || raw === undefined) return NaN;
+    const s = ('' + raw).trim().toLowerCase();
+    if (s === 'auto') return Infinity;
+    const v = parseFloat(s);
+    return v;
+}
+
 function sqrMaxCols() {
-    const el = document.documentElement;
-    const attr = parseFloat(el.getAttribute(SQR_MAX_COLS_ATTR));
-    if (attr > 0) return attr;
-    let v = NaN;
-    try { v = parseFloat(getComputedStyle(el).getPropertyValue(SQR_MAX_COLS_VAR)); } catch (e) {}
+    const v = sqrParseMaxCols(sqrSetting(SQR_MAX_COLS_ATTR, SQR_MAX_COLS_VAR));
     return v > 0 ? v : SQR_MAX_COLS_DEFAULT;
 }
 
@@ -938,7 +959,15 @@ function simulateScreen() {
             sqrHtml.removeAttribute(SQR_COLS_ATTR);
         }
 
-        squareRootStyleTag.innerHTML = (" :root { font-size:"+ ratio*100 +"%; } ");
+        /* --sqr-cols (0.9.1): published next to font-size so the var-driven
+           solved-deck CSS (square-root.scss, "SOLVED DECK COLUMNS") can size
+           a deck for ANY solved count, not just the 2-4 the old per-N
+           attribute rules enumerated -- needed once maxCols can be `auto`
+           and a TV solves to 6, 7, 8 columns. sqrPublishedCols, not cols: it
+           is the same value data-sqr-cols already carries (equal to cols
+           everywhere except inside the landscape-swap seam, see THE SEAM
+           above), so the variable and the attribute never disagree. */
+        squareRootStyleTag.innerHTML = (" :root { font-size:"+ ratio*100 +"%; --sqr-cols:"+ sqrPublishedCols +"; } ");
         /* THE HOST SOLVE (0.9.0). Here and not a line earlier: a host's numbers
            are divided by the root font-size this write just committed, so the
            read has to land after it. With no [data-sqr-host] in the document
@@ -1184,7 +1213,7 @@ function sqrHostSetting(el, attr, varName) {
 }
 
 function sqrHostMaxCols(el) {
-    const raw = parseFloat(sqrHostSetting(el, SQR_MAX_COLS_ATTR, SQR_MAX_COLS_VAR));
+    const raw = sqrParseMaxCols(sqrHostSetting(el, SQR_MAX_COLS_ATTR, SQR_MAX_COLS_VAR));
     return raw > 0 ? raw : SQR_MAX_COLS_DEFAULT;
 }
 
@@ -1236,7 +1265,8 @@ function sqrSolveHost(el) {
              ';--macro-width:'  + (macroW * k) +
              ';--macro-height:' + (macroH * k) +
              ';--sqr-rem:'      + (scale * SQR_REFERENCE_ROOT_PX) + 'px' +
-             ';--sqr-scale:'    + scale + ';'
+             ';--sqr-scale:'    + scale +
+             ';--sqr-cols:'     + cols + ';'
     };
 }
 
@@ -1308,7 +1338,11 @@ function squareRootConfigure(opts) {
         try { els = document.querySelectorAll(opts.host); } catch (e) { els = []; }
         for (let i = 0; i < els.length; i++) {
             els[i].setAttribute(SQR_HOST_ATTR, '');
-            if (opts.maxCols > 0) els[i].setAttribute(SQR_MAX_COLS_ATTR, String(Math.floor(opts.maxCols)));
+            if (typeof opts.maxCols === 'string' && opts.maxCols.trim().toLowerCase() === 'auto') {
+                els[i].setAttribute(SQR_MAX_COLS_ATTR, 'auto');
+            } else if (opts.maxCols > 0) {
+                els[i].setAttribute(SQR_MAX_COLS_ATTR, String(Math.floor(opts.maxCols)));
+            }
             if (opts.deckCols) els[i].setAttribute(SQR_DECK_COLS_ATTR, String(opts.deckCols));
         }
     }

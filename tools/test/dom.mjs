@@ -197,6 +197,12 @@ export function createPage(opts = {}) {
         rootFontSize() { return rootStyle.innerHTML.trim(); },
         rootPx() { return doc.rootPx(); },
         cols() { return html.getAttribute('data-sqr-cols'); },
+        /* --sqr-cols (0.9.1): published on :root next to font-size so the
+           var-driven solved-deck CSS can read any count, not just 2-4. */
+        rootCols() {
+            const m = /--sqr-cols:\s*([\d.eE+-]+)/.exec(rootStyle.innerHTML || '');
+            return m ? m[1] : null;
+        },
         hostStyle() { const t = document.getElementById('square-root-hosts'); return t ? t.innerHTML : null; },
         writes() { return doc.writes.slice(); },
     };

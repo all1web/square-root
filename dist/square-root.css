@@ -1314,6 +1314,11 @@ html[data-sqr-cols="4"].sqr-mode-rows .sqr-span-4 > .sqr-right {
    DESCENDANT of <html> (a host pane) or <html> ITSELF (the whole document in
    solved mode). The mode class always lives on <html>, so the two forms differ in
    where .sqr-mode-rows attaches: beside the scope, or beside <html>. */
+/* $s is either a Sass number (Gate 3's raw-pixel case, pre-solve) or the
+   literal string 'var(--sqr-cols)' (Gate 4, 0.9.1) -- CSS calc() multiplies
+   any number of terms, numeric or var(), so the width expression is built
+   the same way either way; only the Sass-side `$sqr-macro-units * $s`
+   pre-multiplication (which breaks the moment $s is a string) is avoided. */
 /* GATE 3 — THE SOLVED PRE-PAINT (0.9.0). §9.5 of the desktop brief asks for
    "gates for 3 and 4 so a pre-solve desktop paint is right at 1024/1440". A
    finding first: the raw-pixel gates for 3 and 4 already exist above (60rem
@@ -1329,6 +1334,10 @@ html[data-sqr-cols="4"].sqr-mode-rows .sqr-span-4 > .sqr-right {
    and the solver corrects to 3 — server-render data-sqr-cols on the host when
    the shell already knows it and there is no reflow at all. */
 @media (min-width: 40rem) {
+  /* Gate 3's $s is a Sass number: fold it exactly as 0.9.0 did (byte-
+     identical output, `12`/`18`/`24`, not `6 * 2`). Gate 4's $s is the
+     string 'var(--sqr-cols)', which Sass cannot multiply — build that one
+     as a three-term calc() and let the browser multiply it instead. */
   html:not([data-sqr-max-cols="1"]) [data-sqr-deck-cols=solved] [class*=sqr-wide-] {
     width: calc(var(--micro-width) * 12 * 0.0625rem);
   }
@@ -1397,6 +1406,10 @@ html[data-sqr-cols="4"].sqr-mode-rows .sqr-span-4 > .sqr-right {
   }
 }
 @media (min-width: 60rem) {
+  /* Gate 3's $s is a Sass number: fold it exactly as 0.9.0 did (byte-
+     identical output, `12`/`18`/`24`, not `6 * 2`). Gate 4's $s is the
+     string 'var(--sqr-cols)', which Sass cannot multiply — build that one
+     as a three-term calc() and let the browser multiply it instead. */
   html:not([data-sqr-max-cols="1"]) [data-sqr-deck-cols=solved] [class*=sqr-wide-] {
     width: calc(var(--micro-width) * 18 * 0.0625rem);
   }
@@ -1465,6 +1478,10 @@ html[data-sqr-cols="4"].sqr-mode-rows .sqr-span-4 > .sqr-right {
   }
 }
 @media (min-width: 80rem) {
+  /* Gate 3's $s is a Sass number: fold it exactly as 0.9.0 did (byte-
+     identical output, `12`/`18`/`24`, not `6 * 2`). Gate 4's $s is the
+     string 'var(--sqr-cols)', which Sass cannot multiply — build that one
+     as a three-term calc() and let the browser multiply it instead. */
   html:not([data-sqr-max-cols="1"]) [data-sqr-deck-cols=solved] [class*=sqr-wide-] {
     width: calc(var(--micro-width) * 24 * 0.0625rem);
   }
@@ -1532,250 +1549,106 @@ html[data-sqr-cols="4"].sqr-mode-rows .sqr-span-4 > .sqr-right {
     column-span: all;
   }
 }
-/* GATE 4 — WHAT THE SOLVER SOLVED FOR THIS SCOPE (0.9.0). */
-html:not([data-sqr-max-cols="1"]) [data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-wide-] {
-  width: calc(var(--micro-width) * 12 * 0.0625rem);
+/* GATE 4 — WHAT THE SOLVER SOLVED FOR THIS SCOPE (0.9.0, VAR-DRIVEN in
+   0.9.1). Was a per-N loop (2..4), one attribute selector per count. That
+   enumeration is gone: `data-sqr-max-cols="auto"` (docs/desktop-side.md
+   §4(4), owner's ruling 2026-09-19) lets a TV solve to 6, 7, 8+ columns, and
+   enumerating every count a monitor could reach is the fork this package
+   exists to avoid. square-root.js now publishes `--sqr-cols: S` on every
+   solved scope -- <html> itself (next to `font-size`) and each host (next to
+   `--micro-width`, in sqrSolveHost's decls) -- so ONE rule per shape reads
+   the count straight from the cascade instead of the attribute's string:
+   `repeat(var(--sqr-cols), …)` and `column-count: var(--sqr-cols)` accept any
+   integer, no @for needed. The `[data-sqr-cols]` presence check is kept in
+   the selector (not the count) purely as the "has this scope solved yet"
+   guard Gate 3's raw-pixel fallback needs to stay ahead of; the guard does
+   not read the attribute's VALUE, so it costs nothing to widen to 8, and 0.9.0
+   is still on disk unmodified above (Gates 1-3), a page with a numeric
+   ceiling still gets the exact same CSS it always did because --sqr-cols
+   there simply equals data-sqr-cols's own number. */
+/* Gate 3's $s is a Sass number: fold it exactly as 0.9.0 did (byte-
+   identical output, `12`/`18`/`24`, not `6 * 2`). Gate 4's $s is the
+   string 'var(--sqr-cols)', which Sass cannot multiply — build that one
+   as a three-term calc() and let the browser multiply it instead. */
+html:not([data-sqr-max-cols="1"]) [data-sqr-deck-cols=solved][data-sqr-cols] [class*=sqr-wide-] {
+  width: calc(var(--micro-width) * 6 * var(--sqr-cols) * 0.0625rem);
 }
 
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-wide-] {
-  width: calc(var(--micro-width) * 12 * 0.0625rem);
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols] [class*=sqr-wide-] {
+  width: calc(var(--micro-width) * 6 * var(--sqr-cols) * 0.0625rem);
 }
 
-html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-span-] {
+html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols] [class*=sqr-span-] {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--sqr-cols), minmax(0, 1fr));
   grid-auto-flow: row;
   column-gap: 0;
   align-content: start;
   padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
 }
 
-html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-span-] > .sqr-row {
+html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols] [class*=sqr-span-] > .sqr-row {
   grid-column: 1/-1;
 }
 
-html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-span-] > .sqr-left {
+html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols] [class*=sqr-span-] > .sqr-left {
   grid-column: 1;
 }
 
-html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-span-] > .sqr-right {
+html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols] [class*=sqr-span-] > .sqr-right {
   grid-column: 2;
 }
 
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="2"].sqr-mode-rows [class*=sqr-span-] {
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols].sqr-mode-rows [class*=sqr-span-] {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--sqr-cols), minmax(0, 1fr));
   grid-auto-flow: row;
   column-gap: 0;
   align-content: start;
   padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
 }
 
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="2"].sqr-mode-rows [class*=sqr-span-] > .sqr-row {
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols].sqr-mode-rows [class*=sqr-span-] > .sqr-row {
   grid-column: 1/-1;
 }
 
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="2"].sqr-mode-rows [class*=sqr-span-] > .sqr-left {
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols].sqr-mode-rows [class*=sqr-span-] > .sqr-left {
   grid-column: 1;
 }
 
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="2"].sqr-mode-rows [class*=sqr-span-] > .sqr-right {
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols].sqr-mode-rows [class*=sqr-span-] > .sqr-right {
   grid-column: 2;
 }
 
-html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-flow-] {
+html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols] [class*=sqr-flow-] {
   display: block;
-  column-count: 2;
+  column-count: var(--sqr-cols);
   column-gap: 0;
   column-fill: balance;
   padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
 }
 
-html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-flow-] > * {
+html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols] [class*=sqr-flow-] > * {
   break-inside: avoid;
 }
 
-html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-flow-] > .sqr-row {
+html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols] [class*=sqr-flow-] > .sqr-row {
   column-span: all;
 }
 
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="2"].sqr-mode-flow [class*=sqr-flow-] {
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols].sqr-mode-flow [class*=sqr-flow-] {
   display: block;
-  column-count: 2;
+  column-count: var(--sqr-cols);
   column-gap: 0;
   column-fill: balance;
   padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
 }
 
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="2"].sqr-mode-flow [class*=sqr-flow-] > * {
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols].sqr-mode-flow [class*=sqr-flow-] > * {
   break-inside: avoid;
 }
 
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="2"].sqr-mode-flow [class*=sqr-flow-] > .sqr-row {
-  column-span: all;
-}
-
-html:not([data-sqr-max-cols="1"]) [data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-wide-] {
-  width: calc(var(--micro-width) * 18 * 0.0625rem);
-}
-
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-wide-] {
-  width: calc(var(--micro-width) * 18 * 0.0625rem);
-}
-
-html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-span-] {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-flow: row;
-  column-gap: 0;
-  align-content: start;
-  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
-}
-
-html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-span-] > .sqr-row {
-  grid-column: 1/-1;
-}
-
-html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-span-] > .sqr-left {
-  grid-column: 1;
-}
-
-html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-span-] > .sqr-right {
-  grid-column: 2;
-}
-
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="3"].sqr-mode-rows [class*=sqr-span-] {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-flow: row;
-  column-gap: 0;
-  align-content: start;
-  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
-}
-
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="3"].sqr-mode-rows [class*=sqr-span-] > .sqr-row {
-  grid-column: 1/-1;
-}
-
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="3"].sqr-mode-rows [class*=sqr-span-] > .sqr-left {
-  grid-column: 1;
-}
-
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="3"].sqr-mode-rows [class*=sqr-span-] > .sqr-right {
-  grid-column: 2;
-}
-
-html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-flow-] {
-  display: block;
-  column-count: 3;
-  column-gap: 0;
-  column-fill: balance;
-  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
-}
-
-html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-flow-] > * {
-  break-inside: avoid;
-}
-
-html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-flow-] > .sqr-row {
-  column-span: all;
-}
-
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="3"].sqr-mode-flow [class*=sqr-flow-] {
-  display: block;
-  column-count: 3;
-  column-gap: 0;
-  column-fill: balance;
-  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
-}
-
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="3"].sqr-mode-flow [class*=sqr-flow-] > * {
-  break-inside: avoid;
-}
-
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="3"].sqr-mode-flow [class*=sqr-flow-] > .sqr-row {
-  column-span: all;
-}
-
-html:not([data-sqr-max-cols="1"]) [data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-wide-] {
-  width: calc(var(--micro-width) * 24 * 0.0625rem);
-}
-
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-wide-] {
-  width: calc(var(--micro-width) * 24 * 0.0625rem);
-}
-
-html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-span-] {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-flow: row;
-  column-gap: 0;
-  align-content: start;
-  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
-}
-
-html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-span-] > .sqr-row {
-  grid-column: 1/-1;
-}
-
-html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-span-] > .sqr-left {
-  grid-column: 1;
-}
-
-html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-span-] > .sqr-right {
-  grid-column: 2;
-}
-
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="4"].sqr-mode-rows [class*=sqr-span-] {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-flow: row;
-  column-gap: 0;
-  align-content: start;
-  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
-}
-
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="4"].sqr-mode-rows [class*=sqr-span-] > .sqr-row {
-  grid-column: 1/-1;
-}
-
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="4"].sqr-mode-rows [class*=sqr-span-] > .sqr-left {
-  grid-column: 1;
-}
-
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="4"].sqr-mode-rows [class*=sqr-span-] > .sqr-right {
-  grid-column: 2;
-}
-
-html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-flow-] {
-  display: block;
-  column-count: 4;
-  column-gap: 0;
-  column-fill: balance;
-  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
-}
-
-html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-flow-] > * {
-  break-inside: avoid;
-}
-
-html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-flow-] > .sqr-row {
-  column-span: all;
-}
-
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="4"].sqr-mode-flow [class*=sqr-flow-] {
-  display: block;
-  column-count: 4;
-  column-gap: 0;
-  column-fill: balance;
-  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
-}
-
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="4"].sqr-mode-flow [class*=sqr-flow-] > * {
-  break-inside: avoid;
-}
-
-html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="4"].sqr-mode-flow [class*=sqr-flow-] > .sqr-row {
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols].sqr-mode-flow [class*=sqr-flow-] > .sqr-row {
   column-span: all;
 }
 

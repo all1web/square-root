@@ -32,6 +32,12 @@ const ok = (name, cond, detail) => {
     else { fail++; console.log('  FAIL ' + name + (detail ? '   ' + detail : '')); }
 };
 const near = (a, b, tol = 1e-9) => Math.abs(a - b) <= tol;
+/* 0.9.1 appends `--sqr-cols` to the same :root write as `font-size` (see
+   square-root.js, "THE SEAM, published"), so the OLD (HEAD) and NEW solves
+   can no longer be compared by raw string equality -- only the HEAD file
+   ever lacked --sqr-cols. Compare the number the two solvers actually agree
+   or disagree about instead. */
+const fontPct = (s) => { const m = /font-size:\s*([\d.eE+-]+)%/.exec(s || ''); return m ? m[1] : null; };
 
 /* the 0.8.0 solver, straight out of git — the baseline is the tag, not a copy
    somebody remembered to update */
@@ -88,9 +94,9 @@ for (const v of MATRIX) {
         };
         const a = mk(OLD_JS), b = mk(NEW_JS);
         compared++;
-        if (a.rootFontSize() !== b.rootFontSize() || a.cols() !== b.cols()) {
+        if (fontPct(a.rootFontSize()) !== fontPct(b.rootFontSize()) || a.cols() !== b.cols()) {
             mismatches++;
-            console.log(`  FAIL ${v.name} / ${s.label}: 0.8.0 ${a.rootFontSize()} cols=${a.cols()} vs 0.9.0 ${b.rootFontSize()} cols=${b.cols()}`);
+            console.log(`  FAIL ${v.name} / ${s.label}: 0.9.0 ${a.rootFontSize()} cols=${a.cols()} vs 0.9.1 ${b.rootFontSize()} cols=${b.cols()}`);
         }
     }
 }
@@ -99,9 +105,52 @@ ok(`${compared} viewport x switch combinations identical`, mismatches === 0, `${
 /* the canon itself, spelled out, so a regression names a number and not a diff */
 const phone = solve(NEW_JS, { innerWidth: 375, innerHeight: 812, dpr: 3 });
 ok('375x812 root font-size unchanged at 104.16666666666667%',
-    phone.rootFontSize() === ':root { font-size:104.16666666666667%; }', phone.rootFontSize());
+    fontPct(phone.rootFontSize()) === '104.16666666666667', phone.rootFontSize());
 ok('375x812 publishes data-sqr-cols="1"', phone.cols() === '1', String(phone.cols()));
+ok('375x812 publishes --sqr-cols:1 alongside it (0.9.1)', phone.rootCols() === '1', String(phone.rootCols()));
 ok('375x812 creates no host style tag', phone.hostStyle() === null);
+
+// ── A2. no ceiling by choice — data-sqr-max-cols="auto" ─────────────────────
+console.log('\nA2. data-sqr-max-cols="auto" — the owner\'s ruling, 2026-09-19');
+{
+    const AUTO_CASES = [
+        { width: 1440, cols: 4 },
+        { width: 1920, cols: 5 },
+        { width: 2560, cols: 7 },
+        { width: 2880, cols: 8 },
+    ];
+    for (const c of AUTO_CASES) {
+        const page = solve(NEW_JS, {
+            innerWidth: c.width, innerHeight: 1080, dpr: 1,
+            htmlAttrs: { 'data-sqr-max-cols': 'auto' },
+        });
+        ok(`${c.width}px wide, no ceiling, solves ${c.cols} columns`,
+            page.rootCols() === String(c.cols), 'got ' + page.rootCols());
+    }
+    /* the scale stays in band: cols absorbs the width, the finger never
+       drifts more than a rounding step off the canon's 60px. */
+    for (const c of AUTO_CASES) {
+        const page = solve(NEW_JS, {
+            innerWidth: c.width, innerHeight: 1080, dpr: 1,
+            htmlAttrs: { 'data-sqr-max-cols': 'auto' },
+        });
+        const scale = c.width / (360 * c.cols);
+        ok(`${c.width}px: the finger stays within its band (scale ${scale.toFixed(3)})`,
+            scale > 0.9 && scale < 1.15, String(scale));
+    }
+    /* numeric ceilings are unchanged: the same width, capped at 4, never
+       exceeds 4 -- "auto" is additive, not a replacement default. */
+    const capped = solve(NEW_JS, { innerWidth: 2880, innerHeight: 1080, dpr: 1, htmlAttrs: { 'data-sqr-max-cols': '4' } });
+    ok('a numeric ceiling still caps (2880px, max-cols=4, unchanged behaviour)',
+        capped.rootCols() === '4', 'got ' + capped.rootCols());
+    const noAttr = solve(NEW_JS, { innerWidth: 2880, innerHeight: 1080, dpr: 1 });
+    ok('the default ceiling (no attribute) is still 2, byte for byte',
+        noAttr.rootCols() === '2', 'got ' + noAttr.rootCols());
+    /* --sqr-max-cols: auto (the CSS custom property form) */
+    const viaVar = solve(NEW_JS, { innerWidth: 1920, innerHeight: 1080, dpr: 1, vars: { '--sqr-max-cols': 'auto' } });
+    ok('--sqr-max-cols: auto (the custom-property form) also lifts the ceiling',
+        viaVar.rootCols() === '5', 'got ' + viaVar.rootCols());
+}
 
 // ── B. the host solve ──────────────────────────────────────────────────────
 console.log('\nB. the host solve — the pane, not the window');
@@ -148,10 +197,21 @@ for (const c of HOST_CASES) {
     ok('a host does not move <html> data-sqr-cols', page.cols() === bare.cols());
     const css = page.hostStyle() || '';
     ok('the host style tag keys on data-sqr-host-id', /^\[data-sqr-host-id="1"\]\{/.test(css.trim()), css.slice(0, 40));
-    ok('it publishes micro, macro, --sqr-rem and --sqr-scale',
-        ['--micro-width', '--micro-height', '--macro-width', '--macro-height', '--sqr-rem', '--sqr-scale']
+    ok('it publishes micro, macro, --sqr-rem, --sqr-scale and --sqr-cols',
+        ['--micro-width', '--micro-height', '--macro-width', '--macro-height', '--sqr-rem', '--sqr-scale', '--sqr-cols']
             .every((v) => css.includes(v)));
     ok('the host is observed for its own resizes', page.resizeObserved.length === 1);
+}
+
+/* a host may also declare `data-sqr-max-cols="auto"` (0.9.1) */
+{
+    const page = solve(NEW_JS, {
+        innerWidth: 2880, innerHeight: 1080, dpr: 1,
+        htmlAttrs: { 'data-sqr-max-cols': '4' },   // the page ceiling stays 4
+        hosts: [{ width: 2880, attrs: { 'data-sqr-host': '', 'data-sqr-max-cols': 'auto' } }],
+    });
+    ok('a host ceiling of "auto" overrides a numeric page ceiling',
+        page.hosts[0].getAttribute('data-sqr-cols') === '8', String(page.hosts[0].getAttribute('data-sqr-cols')));
 }
 
 /* a host with its own narrower ceiling, and the 320px floor */
@@ -209,33 +269,49 @@ console.log('\nC. dist — the solved deck, and additions only');
 const dist = fs.readFileSync(path.join(ROOT, 'dist', 'square-root.css'), 'utf8');
 const old = fs.readFileSync(OLD_CSS, 'utf8');
 
-/* ADDITIONS ONLY: every line of the 0.8.0 stylesheet still appears, in the
-   same order, in the 0.9.0 one. A subsequence check is exactly the right
-   shape for "nothing was changed or removed, only inserted". */
+/* ADDITIONS ONLY THROUGH GATE 3: everything up to "GATE 4" is untouched, in
+   order. Gate 4 itself is NOT additions-only as of 0.9.1 — it is a stated
+   REPLACEMENT (docs/desktop-side.md §4(4), owner's ruling 2026-09-19): the
+   per-N attribute enumeration (2..4, ~127 lines) is swapped for a handful of
+   var(--sqr-cols) rules that resolve ANY count, because "auto" lets a scope
+   solve past 4 and enumerating every count a TV could reach is exactly the
+   fork this package exists to avoid. The subsequence check therefore runs
+   only over the shared prefix (0.4.0's gates and earlier), where nothing
+   changed or moved. */
 {
-    const a = old.split('\n'), b = dist.split('\n');
+    const gateMarker = '/* GATE 4 — WHAT THE SOLVER SOLVED';
+    const aFull = old.split('\n'), bFull = dist.split('\n');
+    const aCut = aFull.findIndex((l) => l.includes(gateMarker));
+    const a = aCut >= 0 ? aFull.slice(0, aCut) : aFull;
+    const b = bFull;
     let i = 0, firstMiss = null;
     for (let j = 0; j < b.length && i < a.length; j++) if (a[i] === b[j]) i++;
     if (i < a.length) firstMiss = a[i];
-    ok('the 0.8.0 stylesheet is an exact subsequence of the 0.9.0 one (additions only)',
+    ok('everything before Gate 4 is an exact subsequence of 0.9.0 (additions only)',
         i === a.length, firstMiss ? 'first line lost: ' + JSON.stringify(firstMiss) : '');
-    console.log(`       ${a.length} lines before, ${b.length} after, +${b.length - a.length}`);
+    console.log(`       ${aFull.length} lines before, ${bFull.length} after, ${bFull.length - aFull.length >= 0 ? '+' : ''}${bFull.length - aFull.length} (Gate 4 replaced, not appended)`);
 }
 
 ok('the 2-column raw-pixel gate block is byte-identical',
     dist.includes('@media (min-width: 40rem) {\n  /* WIDTH — the section itself. Below both gates it is one macro column,'));
 
-for (const s of [2, 3, 4]) {
-    ok(`solved scope at data-sqr-cols="${s}" resolves spans to ${s}`,
-        dist.includes(`html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="${s}"] [class*=sqr-span-] {`) &&
-        new RegExp(`\\[data-sqr-cols="${s}"\\] \\[class\\*=sqr-span-\\] \\{[^}]*repeat\\(${s},`).test(dist));
-    ok(`solved scope at data-sqr-cols="${s}" resolves flows to ${s}`,
-        new RegExp(`\\[data-sqr-cols="${s}"\\] \\[class\\*=sqr-flow-\\] \\{[^}]*column-count: ${s};`).test(dist));
-    ok(`solved scope at data-sqr-cols="${s}" resolves wides to ${s} macro columns`,
-        new RegExp(`\\[data-sqr-cols="${s}"\\] \\[class\\*=sqr-wide-\\] \\{\\s*width: calc\\(var\\(--micro-width\\) \\* ${6 * s} `).test(dist));
-    ok(`…and the <html>-as-scope form exists too`,
-        dist.includes(`html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="${s}"].sqr-mode-rows [class*=sqr-span-] {`));
-}
+/* GATE 4 is var-driven as of 0.9.1 (docs/desktop-side.md §4(4), owner's
+   ruling 2026-09-19): one rule per shape, reading `--sqr-cols` off the
+   cascade, so it resolves to ANY solved count -- 2 through 8 and beyond --
+   with no per-N enumeration. `[data-sqr-cols]` (bare, no `="N"`) is kept as
+   the "has this scope solved" guard; the count itself comes from the
+   variable, not the attribute's string. */
+ok('the var-driven solved-span rule uses --sqr-cols, not an enumerated count',
+    dist.includes('html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols] [class*=sqr-span-] {') &&
+    /\[data-sqr-cols\] \[class\*=sqr-span-\] \{[^}]*repeat\(var\(--sqr-cols\),/.test(dist));
+ok('the var-driven solved-flow rule uses --sqr-cols',
+    /\[data-sqr-cols\] \[class\*=sqr-flow-\] \{[^}]*column-count: var\(--sqr-cols\);/.test(dist));
+ok('the var-driven solved-wide rule uses --sqr-cols',
+    /\[data-sqr-cols\] \[class\*=sqr-wide-\] \{\s*width: calc\(var\(--micro-width\) \* 6 \* var\(--sqr-cols\)/.test(dist));
+ok('…and the <html>-as-scope form exists too',
+    dist.includes('html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols].sqr-mode-rows [class*=sqr-span-] {'));
+ok('no per-count enumeration remains for Gate 4 (2, 3 and 4 no longer named in an attribute selector)',
+    ![2, 3, 4].some((n) => dist.includes(`[data-sqr-deck-cols=solved][data-sqr-cols="${n}"]`)));
 ok('the ceiling still wins: every solved rule is guarded',
     (dist.match(/\[data-sqr-deck-cols=solved\]/g) || []).length ===
     (dist.match(/html:not\(\[data-sqr-max-cols="1"\]\)[^\n]*\[data-sqr-deck-cols=solved\]/g) || []).length);

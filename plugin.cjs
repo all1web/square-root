@@ -51,7 +51,11 @@ function solvedDeckBlock(s, at) {
   const rows = [`${GUARD}.sqr-mode-rows ${at}`, `${GUARD}${at}.sqr-mode-rows`];
   const flows = [`${GUARD}.sqr-mode-flow ${at}`, `${GUARD}${at}.sqr-mode-flow`];
   const out = {};
-  for (const p of wides) out[`${p} [class*="sqr-wide-"]`] = { width: unit(6 * s) };
+  /* Gate 3's $s is a number (2-4, the raw-pixel pre-paint) and folds exactly
+     as 0.9.0 did. Gate 4's $s is the string 'var(--sqr-cols)' (0.9.1) — see
+     the SCSS mixin's own comment for why: any count, no enumeration. */
+  const wideWidth = typeof s === 'number' ? unit(6 * s) : `calc(var(--micro-width) * 6 * ${s} * 0.0625rem)`;
+  for (const p of wides) out[`${p} [class*="sqr-wide-"]`] = { width: wideWidth };
   for (const p of rows) {
     out[`${p} [class*="sqr-span-"]`] = {
       display: 'grid',
@@ -85,10 +89,12 @@ function solvedDeck() {
   for (let m = 2; m <= 4; m++) {
     out[`@media (min-width: ${m * 20}rem)`] = solvedDeckBlock(m, SOLVED);
   }
-  /* GATE 4 — what the solver solved for this scope. */
-  for (let s = 2; s <= 4; s++) {
-    Object.assign(out, solvedDeckBlock(s, `${SOLVED}[data-sqr-cols="${s}"]`));
-  }
+  /* GATE 4 — what the solver solved for this scope (0.9.1: var-driven, any
+     count — see square-root.scss's own Gate 4 comment). `[data-sqr-cols]`
+     bare is the "has this scope solved" guard; 'var(--sqr-cols)' supplies
+     the actual count, so this fires once for the whole feature instead of
+     once per enumerated N. */
+  Object.assign(out, solvedDeckBlock('var(--sqr-cols)', `${SOLVED}[data-sqr-cols]`));
   return out;
 }
 

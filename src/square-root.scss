@@ -264,9 +264,19 @@ $sqr-macro-units: 6;      /* --macro-width / --micro-width */
 $sqr-solved: '[data-sqr-deck-cols="solved"]';
 $sqr-guard:  'html:not([data-sqr-max-cols="1"])';
 
+/* $s is either a Sass number (Gate 3's raw-pixel case, pre-solve) or the
+   literal string 'var(--sqr-cols)' (Gate 4, 0.9.1) -- CSS calc() multiplies
+   any number of terms, numeric or var(), so the width expression is built
+   the same way either way; only the Sass-side `$sqr-macro-units * $s`
+   pre-multiplication (which breaks the moment $s is a string) is avoided. */
 @mixin sqr-solved-deck($s, $wides, $rows, $flows) {
+    /* Gate 3's $s is a Sass number: fold it exactly as 0.9.0 did (byte-
+       identical output, `12`/`18`/`24`, not `6 * 2`). Gate 4's $s is the
+       string 'var(--sqr-cols)', which Sass cannot multiply — build that one
+       as a three-term calc() and let the browser multiply it instead. */
+    $sqr-wide-mag: if(type-of($s) == 'number', $sqr-macro-units * $s, '#{$sqr-macro-units} * #{$s}');
     @each $p in $wides {
-        #{$p} [class*="sqr-wide-"] { width: calc(var(--micro-width) * #{$sqr-macro-units * $s} * 0.0625rem); }
+        #{$p} [class*="sqr-wide-"] { width: calc(var(--micro-width) * #{$sqr-wide-mag} * 0.0625rem); }
     }
     @each $p in $rows {
         #{$p} [class*="sqr-span-"] {
@@ -317,14 +327,28 @@ $sqr-guard:  'html:not([data-sqr-max-cols="1"])';
     }
 }
 
-/* GATE 4 — WHAT THE SOLVER SOLVED FOR THIS SCOPE (0.9.0). */
-@for $s from 2 through 4 {
-    $at: '#{$sqr-solved}[data-sqr-cols="#{$s}"]';
-    @include sqr-solved-deck($s,
-        ('#{$sqr-guard} #{$at}',                 '#{$sqr-guard}#{$at}'),
-        ('#{$sqr-guard}.sqr-mode-rows #{$at}',   '#{$sqr-guard}#{$at}.sqr-mode-rows'),
-        ('#{$sqr-guard}.sqr-mode-flow #{$at}',   '#{$sqr-guard}#{$at}.sqr-mode-flow'));
-}
+/* GATE 4 — WHAT THE SOLVER SOLVED FOR THIS SCOPE (0.9.0, VAR-DRIVEN in
+   0.9.1). Was a per-N loop (2..4), one attribute selector per count. That
+   enumeration is gone: `data-sqr-max-cols="auto"` (docs/desktop-side.md
+   §4(4), owner's ruling 2026-09-19) lets a TV solve to 6, 7, 8+ columns, and
+   enumerating every count a monitor could reach is the fork this package
+   exists to avoid. square-root.js now publishes `--sqr-cols: S` on every
+   solved scope -- <html> itself (next to `font-size`) and each host (next to
+   `--micro-width`, in sqrSolveHost's decls) -- so ONE rule per shape reads
+   the count straight from the cascade instead of the attribute's string:
+   `repeat(var(--sqr-cols), …)` and `column-count: var(--sqr-cols)` accept any
+   integer, no @for needed. The `[data-sqr-cols]` presence check is kept in
+   the selector (not the count) purely as the "has this scope solved yet"
+   guard Gate 3's raw-pixel fallback needs to stay ahead of; the guard does
+   not read the attribute's VALUE, so it costs nothing to widen to 8, and 0.9.0
+   is still on disk unmodified above (Gates 1-3), a page with a numeric
+   ceiling still gets the exact same CSS it always did because --sqr-cols
+   there simply equals data-sqr-cols's own number. */
+$sqr-solved-any: '#{$sqr-solved}[data-sqr-cols]';
+@include sqr-solved-deck('var(--sqr-cols)',
+    ('#{$sqr-guard} #{$sqr-solved-any}',               '#{$sqr-guard}#{$sqr-solved-any}'),
+    ('#{$sqr-guard}.sqr-mode-rows #{$sqr-solved-any}', '#{$sqr-guard}#{$sqr-solved-any}.sqr-mode-rows'),
+    ('#{$sqr-guard}.sqr-mode-flow #{$sqr-solved-any}', '#{$sqr-guard}#{$sqr-solved-any}.sqr-mode-flow'));
 
 /* THE CEILING WINS. A page that declares one column never spans. */
 :root[data-sqr-max-cols="1"] [class*="sqr-wide-"] { width: calc(var(--micro-width) * 6 * 0.0625rem); }

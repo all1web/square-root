@@ -752,6 +752,25 @@ Both are opt-in; a page with neither behaves exactly as 0.8.0 did, and `npm test
 the 0.8.0 solver out of git. Full design, the API table and the two open owner decisions:
 **[docs/desktop-side.md](docs/desktop-side.md)**.
 
+**No ceiling, by choice (`data-sqr-max-cols="auto"`, 0.9.1).** The owner's ruling on §4(4) above:
+*"I don't care if it turns into 8 columns if it's a TV and fits right. I need it to never get that
+fat — I am sure there is some intelligent algorithm."* The algorithm was already here — `cols = round(width / macro)`, floored at a 320px column — so `auto` just tells the solver not to cap that
+count: the FINGER never leaves its band, because the COLUMN COUNT absorbs the width instead. A
+2880px TV solves 8 columns of a ~60px finger, not 4 columns of a 106px one; a 720px watch still
+solves 1. Numeric ceilings (`data-sqr-max-cols="2"`, `"4"`, …) are unchanged — `auto` is additive:
+
+```html
+<html data-sqr-max-cols="auto">                      <!-- window scope: no ceiling -->
+<div data-sqr-host data-sqr-max-cols="auto">…</div>  <!-- host scope: no ceiling for this pane -->
+:root { --sqr-max-cols: auto }                       <!-- the custom-property form -->
+```
+
+Every solved scope also publishes **`--sqr-cols`** now (next to `--micro-width` on a host, next to
+`font-size` on `<html>`) — the count as a plain number, not a string to parse off the attribute. The
+solved-deck CSS (`data-sqr-deck-cols="solved"`) reads it directly: `repeat(var(--sqr-cols), …)` and
+`column-count: var(--sqr-cols)` resolve a deck to whatever the scope solved, 2 through 8 and beyond,
+with no per-count rule to add when `auto` lets a scope go past 4.
+
 ---
 
 ## Known quirks

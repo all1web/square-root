@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.9.1 — 2026-09-19
+
+**No ceiling, by choice.** Owner's ruling on `docs/desktop-side.md` §4(4): *"With Square Root I
+don't care if it turns into 8 columns if it's a TV and fits right. I need it to never get that fat —
+I am sure there is some intelligent algorithm."* The algorithm was already here (`cols = round(width
+/ macro)`, floored at 320px), so the fix is one new value for an attribute that already existed:
+
+- `data-sqr-max-cols="auto"` (or `--sqr-max-cols: auto`), on `<html>` or on a `data-sqr-host` — no
+  ceiling. `cols = round(width / macro)`, 1 minimum, no upper clamp, and the finger stays in its
+  scale band because the COUNT absorbs the width, never the unit: a 2880px TV solves 8 columns of a
+  ~60px finger, not 4 of a 106px one. Numeric ceilings are byte-for-byte unchanged; `auto` is
+  additive and the default stays the numeric `2` it always was.
+- Every solved scope now publishes **`--sqr-cols`** — next to `--micro-width` on a host, next to
+  `font-size` on `<html>` — the count as a number, always, whether or not `data-sqr-cols` the
+  attribute is written this turn.
+- The solved-deck CSS (`data-sqr-deck-cols="solved"`, 0.9.0) is now **var-driven** instead of
+  enumerated: Gate 4 was one attribute rule per count (`[data-sqr-cols="2"]` … `="4"]`, ~127 lines);
+  it is now a handful of rules keyed on `[data-sqr-cols]` (presence, not value) that read
+  `var(--sqr-cols)` — `repeat(var(--sqr-cols), …)`, `column-count: var(--sqr-cols)`, `calc(var(
+  --micro-width) * 6 * var(--sqr-cols) * 0.0625rem)` — so a deck resolves to ANY solved count with no
+  new CSS to add. Gate 3 (the raw-pixel pre-solve gates at 40/60/80rem, still 2/3/4 — a page cannot
+  guess past its own media query) is untouched. This is a stated **replacement**, not an addition:
+  the dist diff for Gate 4 is -127 lines even though the feature now covers more counts; everything
+  before Gate 4 in the stylesheet is still an exact, in-order subsequence of 0.9.0's, proved by
+  `npm test`.
+- `plugin.cjs` mirrors both changes rule for rule; `npm run verify:plugin` is 241/241, zero
+  mismatches, zero missing.
+
 ## 0.9.0 — 2026-09-19
 
 **The desktop side: a solve that belongs to a pane, not to the window.**
