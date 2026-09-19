@@ -126,3 +126,46 @@ columns of 480 and 640px — a 80px and a 106px finger.
 **Recommendation: C**, and only if the owner has a 1920+ monitor he actually works on. It fixes the
 oversized finger, which is the real defect, without doubling the stylesheet for a column nobody has
 asked for. A is a perfectly good answer until then.
+
+---
+
+## 5. When the solve runs (0.9.2)
+
+Owner, 2026-09-19 04:33 ET: *"sometimes the iPad landscape loads the page in 1 column and you have
+to rotate it back and forth for it to fix the root font size … it needs to always happen as soon as
+possible."*
+
+**Measured** on the host app (headless Edge, 1194×834, `/tesla.com?shell=phone`, package 0.9.1):
+
+| t after navigation | what happened | `:root` font-size |
+|---|---|---|
+| 3103 ms | the module executes; the solve writes its `100%` measuring baseline | 16px |
+| 3181 ms | DOMContentLoaded | 16px |
+| 3426 ms | the solve commits `110.55555555555556%`, `data-sqr-cols=3` | 17.69px |
+| 7024 ms | **`load` → the root is reset to 100% again** | **16px** |
+| 7534 ms | …and the *identical* answer is written back | 17.69px |
+
+Half a second of the whole design at canon scale for a solve whose answer had not moved — and that
+is the *safe* version. The unsafe ones leave the baseline in place for good:
+
+1. `window.onload = squareRootResolve` was the only thing that re-ran the solve, so a document still
+   parsing when this file executed (no probe yet → clean abandon) waited for `load` — seconds on an
+   asset-heavy page, and forever if `load` had already fired.
+2. the orientation handler wrote `:root{font-size:100%}` itself and then called `simulateScreen()`,
+   which **drops** the call when a solve is in flight. A rotation landing mid-solve pinned the root
+   at 100% with `data-sqr-cols` still saying 3, and nothing re-queued it — until the next rotation.
+   That is the owner's sentence word for word.
+3. `screen.orientation` does not exist on iPadOS before 16.4, so that same line threw at module
+   execution and took the MutationObserver below it — the live switch for every `data-sqr-*`
+   attribute — down with it.
+
+**The rule now.** The first solve runs at module execution when `document.readyState !== 'loading'`
+and at `DOMContentLoaded` when it is; it never waits for `load`. `resize`, `load` and both rotation
+events are registered with `addEventListener` (assigning `window.onload` replaces the host page's
+own handler) and go through the retrying resolver, so none of them can be dropped. `load` and
+`resize` are *re-solves that do nothing when nothing changed*, proved on four things rather than
+assumed: same viewport and dpr, same switch signature, our CSS still the style tag's content, and
+the probe still reading what the committed scale implies. A late stylesheet, a rewritten canon, a
+morph that replaced the tag or took the probe each fail one of them and get a real solve.
+`window.squareRootResolve()` is never short-circuited — it is the documented door for a custom
+property, which no input can see.

@@ -366,7 +366,7 @@ ratio = width / simulatedWidth;
 
 At 1200px with a 360px probe: `parseInt(3.33) = 3`, so it solves for `1200 / 1080 = 1.111` → root `111.1%`, and three 400px columns tile the viewport exactly. No ragged right edge, no half-column gutter. At 1440px it lands on 4 × 360 = 1440, ratio exactly 1.
 
-**Re-solving.** `simulateScreen()` runs once at parse time, again on `window.onresize`, and again on `screen.orientation` `change` (which resets the root to 100% first). A module-level `window.simuating` flag (spelling as in source) makes overlapping runs a no-op; it is cleared about a second after a solve begins, so resize events fired inside that window are dropped rather than queued. Since 0.2.0 there is a fourth trigger — `window.squareRootResolve()` and the peek observer below — which retries instead of being dropped.
+**Re-solving (0.9.2).** The first solve runs as soon as the probe can be measured — at module execution when `document.readyState !== 'loading'`, otherwise at `DOMContentLoaded`. It never waits for `load`. `resize`, `load` and both rotation events are registered with `addEventListener` (the package never assigns `window.onload` / `window.onresize`, which would replace the host page's own handler) and all of them go through `window.squareRootResolve()`'s retry, so a call landing while `window.simuating` is raised is re-queued rather than dropped. `load` and `resize` are re-solves that **do nothing at all when nothing has changed** — same viewport and dpr, same switch signature, our CSS still the style tag's content, and the probe still reading what the committed scale implies — so the page is never reset to the 100% measuring baseline for an answer that cannot move. `window.squareRootResolve()` itself is never short-circuited: call it after changing a custom property. See `docs/desktop-side.md` §5 for the measured timeline this replaced.
 
 ---
 
@@ -613,8 +613,9 @@ output, and watching it would make every solve schedule the next one.
 **On, it reads the viewport height** — so a height-only resize can now change the answer. On mobile
 that means the collapsing URL bar. Unlike the fit modes this output is discrete, so the design does
 not breathe with the bar; it flips, once, and only if the window is sitting exactly on a boundary.
-Pick an `aspect` you are not living on. `window.onresize` is `squareRootResolve()` (not the raw
-solver), so a resize landing mid-solve is retried rather than dropped — with the raw solver a dropped
+Pick an `aspect` you are not living on. The `resize` **listener** (0.9.2 — `window.onresize` is never
+assigned) goes through `squareRootResolve()`, not the raw
+solver, so a resize landing mid-solve is retried rather than dropped — with the raw solver a dropped
 resize on a foldable could otherwise strand a stale, too-wide column layout.
 
 **At a ceiling of 2 the pass cannot fire at all** — the arithmetic is in
@@ -808,6 +809,8 @@ window.onload = simulateScreen();   // parentheses: calls it, assigns undefined
 ```
 
 The trailing `()` **invokes** `simulateScreen` immediately and assigns its return value — `undefined` — to `window.onload`. There is no load handler. In practice the bug is masked: the bare `simulateScreen()` on the line above already runs at parse time, and `onresize` plus the orientation listener cover everything after. But if you ever depend on a re-solve after images and webfonts finish loading, it is not happening. The fix, if you want it, is dropping the parentheses.
+
+*Fixed in 2026-09-11 (the parentheses) and again in **0.9.2**, which replaced all three assignments with listeners and moved the first solve off "parse time" onto `readyState` / `DOMContentLoaded` — see the Re-solving note above and `docs/desktop-side.md` §5.*
 
 **Smaller things in the same spirit**
 

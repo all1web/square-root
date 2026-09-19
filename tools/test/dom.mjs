@@ -105,6 +105,17 @@ export function createPage(opts = {}) {
         return el;
     });
 
+    /* EVERY WRITE TO THE ROOT STYLE TAG IS RECORDED (0.9.2). "`load` after a
+       settled solve writes nothing new" is a claim about writes, not about the
+       value that happens to be there when you look — the old code wrote 100%
+       and then wrote the identical answer back, and both readings agree. */
+    doc.styleWrites = [];
+    let rootStyleHtml = '';
+    Object.defineProperty(rootStyle, 'innerHTML', {
+        get() { return rootStyleHtml; },
+        set(v) { rootStyleHtml = v; doc.styleWrites.push(v); },
+    });
+
     doc.rootPx = () => {
         const m = /font-size\s*:\s*([\d.eE+-]+)%/.exec(rootStyle.innerHTML || '');
         return m ? (16 * parseFloat(m[1])) / 100 : 16;
@@ -112,11 +123,21 @@ export function createPage(opts = {}) {
 
     html._clientHeight = opts.innerHeight || 812;
 
+    /* LISTENERS (0.9.2). The solver registers on `document`
+       (DOMContentLoaded) and on `window` (resize, load, orientationchange)
+       instead of assigning window.onload/onresize, so the harness has to be
+       able to fire them — and to prove that the assignments are gone. */
+    const listeners = { document: {}, window: {} };
+    const addTo = (bag) => (type, fn) => { (bag[type] || (bag[type] = [])).push(fn); };
+
     const document = {
         documentElement: html,
         head,
         body,
         writes: doc.writes,
+        readyState: opts.readyState || 'complete',
+        addEventListener: addTo(listeners.document),
+        removeEventListener() {},
         getElementById(id) { return doc.all.find((e) => e.id === id) || null; },
         createElement(tag) { return new El(doc, tag); },
         getElementsByTagName(t) { return t === 'head' ? [head] : []; },
@@ -169,6 +190,8 @@ export function createPage(opts = {}) {
         innerHeight: opts.innerHeight || 812,
         devicePixelRatio: opts.dpr || 2,
         simuating: false,
+        addEventListener: addTo(listeners.window),
+        removeEventListener() {},
     };
     doc.win = win;
 
@@ -176,7 +199,7 @@ export function createPage(opts = {}) {
         window: win,
         document,
         getComputedStyle,
-        screen: { orientation: { addEventListener() {} } },
+        screen: { orientation: { addEventListener: addTo(listeners.screen = {}) } },
         setTimeout: setTimeout_,
         clearTimeout: clearTimeout_,
         console: { log() {}, warn() {}, error() {} },
@@ -205,5 +228,17 @@ export function createPage(opts = {}) {
         },
         hostStyle() { const t = document.getElementById('square-root-hosts'); return t ? t.innerHTML : null; },
         writes() { return doc.writes.slice(); },
+        /* 0.9.2 */
+        styleWrites() { return doc.styleWrites.slice(); },
+        listeners,
+        /* fire('window', 'load') — and it throws if nothing is listening, so a
+           test that means to fire `load` cannot silently fire nothing. */
+        fire(target, type) {
+            const fns = (listeners[target] || {})[type];
+            if (!fns || !fns.length) throw new Error(`no ${target} listener for "${type}"`);
+            fns.slice().forEach((f) => f({ type }));
+        },
+        setReadyState(v) { document.readyState = v; },
+        resize(w, h) { win.innerWidth = w; win.innerHeight = h; html._clientHeight = h; },
     };
 }

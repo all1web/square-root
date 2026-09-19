@@ -521,6 +521,21 @@ function simulateScreen() {
     if(window.simuating) return null;
     window.simuating = true;
 
+    /* A SOLVE THAT CANNOT CHANGE ANYTHING DOES NOTHING (0.9.2).
+       Every solve below begins by writing ":root{font-size:100%}" into the
+       live page as its measuring baseline and only undoes it ~500ms later.
+       That is unavoidable for a solve that has something to measure — and
+       inexcusable for one that has not, because for half a second the whole
+       design is at canon scale, and any interruption in between (a throw, a
+       morph that takes the probe, a dropped re-entrant call) leaves it there.
+       `load` firing seconds after a settled solve was exactly that: measured
+       on the owner's page, 510ms at 16px for a solve that then wrote back the
+       identical 110.55555555555556%.
+       sqrSolveIsSettled() answers "same viewport, same switches, same style
+       tag, same probe" — so it can only skip a solve that had nothing to say.
+       See the foot of this file. */
+    if (sqrSolveIsSettled()) { window.simuating = false; return null; }
+
     /* ── THE GUARD IS RELEASED ON EVERY EXIT, INCLUDING A THROW ────────
        (2026-09-11, found from the owner's report: "there's something buggy
        about the peek next card option ... toggling it made it stop working")
@@ -978,6 +993,17 @@ function simulateScreen() {
            cleared so a late failure in the verification read cannot roll the
            page back to the scale it had before this solve. */
         sqrPrevRootCss = null;
+        /* …and it is RECORDED (0.9.2): what it was solved from, what the probe
+           read, and the exact CSS it published. A later event-driven resolve
+           that finds all three unchanged returns without touching the page.
+           Recorded HERE, inside the deferred read, so the inputs are the ones
+           this solve actually measured and not the ones that happened to be
+           true when it was scheduled. */
+        sqrSettled = {
+            inputs: sqrSolveInputs(),
+            simulatedWidth: simulatedWidth,
+            css: squareRootStyleTag.innerHTML
+        };
         setTimeout(function(){
             /* A REPORT, NEVER THE SOLVE. These three lines only re-measure the
                probe to log what the new scale produced, and they were the
@@ -1005,7 +1031,13 @@ function simulateScreen() {
 
 }
 
-simulateScreen();
+/* THE FIRST SOLVE MOVED (0.9.2). It used to be called right here, at module
+   execution, unconditionally — which is too early when this file is loaded
+   while the document is still parsing (the probe is not in the DOM yet, so the
+   solve abandons) and too LATE in the sense that nothing then re-ran it until
+   `window.onload`, seconds away on an asset-heavy page. It now lives at the
+   foot of this file under "WHEN THE SOLVE RUNS", where readyState decides
+   between "now" and "at DOMContentLoaded". See docs/desktop-side.md §5. */
 /* REFUTER FIX (major #4, Opus subagent, 2026-09-10): was `= simulateScreen`.
    simulateScreen() drops (not queues) any call landing while
    window.simuating is true (the guard at the top of the function), so a
@@ -1023,7 +1055,9 @@ simulateScreen();
    re-queues itself at ~1100ms if the guard is still held, instead of
    dropping. window.onload three lines below is unchanged: it fires once, at
    a point simuating is never true, so it never needed the retry. */
-window.onresize = squareRootResolve;
+/* 0.9.2: `window.onresize = …` was an ASSIGNMENT, and an assignment to
+   window.onresize silently replaces whatever handler the host page had put
+   there. Registered as a listener at the foot of this file instead. */
 /* A HANDLER, NOT A CALL (2026-09-11). This read `= simulateScreen()`, with the
    parentheses — so it INVOKED the solver right here, two lines after the call
    above had already raised the guard, got `null` back, and assigned that null
@@ -1037,15 +1071,36 @@ window.onresize = squareRootResolve;
    the same reason onresize above was changed. This adds a second solve at
    window load where there was none; it is what the original line intended, and
    the guard makes it free when the first solve has already settled. */
-window.onload = squareRootResolve;
+/* 0.9.2: and the load solve is a listener too, at the foot of this file — plus
+   it is now a RE-solve that does nothing at all when nothing has changed, so
+   it no longer resets the live page to 100% for half a second at `load`. */
 
 
-screen.orientation.addEventListener("change", function(e) {
-    let squareRootStyleTag = document.getElementById('square-root');
-    squareRootStyleTag.innerHTML = (" :root { font-size:100%; } ");
-    simulateScreen();
+/* THE ORIENTATION HANDLER, 0.9.2 — the measured cause of the owner's iPad bug.
+   It used to read:
 
-});
+       screen.orientation.addEventListener("change", function(e) {
+           let squareRootStyleTag = document.getElementById('square-root');
+           squareRootStyleTag.innerHTML = (" :root { font-size:100%; } ");
+           simulateScreen();
+       });
+
+   Three defects in four lines:
+     · it wrote the 100% MEASURING BASELINE straight into the live page and
+       then called simulateScreen(), which returns null immediately when a
+       solve is already in flight (`if(window.simuating) return null`) — so a
+       rotation landing during any other solve left the root pinned at 100%,
+       i.e. the whole design at canon scale, with data-sqr-cols still saying 3.
+       Nothing re-ran: the drop is not queued. That is "the iPad loads in one
+       column and you have to rotate it back and forth", exactly;
+     · it read `.innerHTML` off a possibly-null tag (the second throw site
+       2026-09-11 fixed everywhere else);
+     · `screen.orientation` does not exist on iPadOS before 16.4, so this line
+       THREW at module execution and took the MutationObserver below it — the
+       live switch for every data-sqr-* attribute — down with it.
+   The baseline write is gone (simulateScreen writes and restores its own), the
+   call retries instead of dropping, and both the modern and the legacy event
+   are registered, inside a try. */
 
 
 // ---------------------------------------------------------------------------
@@ -1057,15 +1112,33 @@ screen.orientation.addEventListener("change", function(e) {
 // dropped by `if(window.simuating) return null;`. Here it is retried once the
 // guard releases instead, which is what lets you flip the class twice in quick
 // succession and still land on the right scale.
+//
+// 0.9.2 — TWO DOORS, ONE RETRY. The public door (window.squareRootResolve)
+// always performs a real solve: it is what the docs tell a host app to call
+// after changing a custom property, and custom properties are deliberately not
+// in the signature above, so it must never be short-circuited. The EVENT door
+// (resize, load) may be answered with "nothing has changed" — see
+// sqrSolveIsSettled() at the foot of this file. The retry is shared, and a
+// forced resolve that has to wait stays forced.
 let sqrResolveRetry = null;
-function squareRootResolve() {
+let sqrResolvePendingForce = false;
+function sqrResolveInternal(force) {
+    force = !!force || sqrResolvePendingForce;
     clearTimeout(sqrResolveRetry);
     if (window.simuating) {
-        sqrResolveRetry = setTimeout(squareRootResolve, 1100);   // guard releases at ~1000ms
+        sqrResolvePendingForce = force;
+        sqrResolveRetry = setTimeout(function () { sqrResolveInternal(force); }, 1100);   // guard releases at ~1000ms
         return;
     }
+    sqrResolvePendingForce = false;
+    if (force) sqrSettled = null;       // "solve it again" means solve it again
     simulateScreen();
 }
+function squareRootResolve() { sqrResolveInternal(true); }
+/* The listener form. Registered, never assigned — and it takes NO arguments,
+   because a DOM listener is handed an Event and `force = !!event` would make
+   every resize a forced solve. */
+function sqrResolveOnEvent() { sqrResolveInternal(false); }
 window.squareRootResolve = squareRootResolve;
 
 // Toggling the class should be enough on its own — nobody should have to
@@ -1350,3 +1423,112 @@ function squareRootConfigure(opts) {
 }
 window.squareRootConfigure = squareRootConfigure;
 window.squareRootSolveHosts = sqrSolveHosts;
+
+
+// ---------------------------------------------------------------------------
+// WHEN THE SOLVE RUNS (0.9.2) — docs/desktop-side.md §5.
+//
+// THE OWNER'S REPORT, 2026-09-19 04:33 ET: "sometimes the iPad landscape loads
+// the page in 1 column and you have to rotate it back and forth for it to fix
+// the root font size … it needs to always happen as soon as possible."
+//
+// MEASURED on the host app (headless Edge, 1194x834, the real page):
+//
+//   t=3103ms  the module executes; the solve writes ":root{font-size:100%}"
+//   t=3181ms  DOMContentLoaded
+//   t=3426ms  the solve commits 110.55555555555556% / data-sqr-cols=3
+//   t=7024ms  load  ->  the root is reset to 100% (16px) again
+//   t=7534ms  …and the identical 110.55555555555556% is written back.
+//
+// Half a second of the whole design at canon scale, for a solve whose answer
+// had not moved — and that half second is the SAFE version of the failure.
+// The unsafe versions all end with the 100% baseline never being undone:
+//   · the orientation handler wrote it and then called simulateScreen(), which
+//     DROPS the call if a solve is in flight (see its note above);
+//   · nothing ran the first solve except module execution and `load`, so on a
+//     document that was still parsing when this file executed, the probe was
+//     absent, the solve abandoned, and the page waited for `load` — seconds on
+//     an asset-heavy page, and forever if `load` had already fired.
+// Both leave a page that only a rotation or a window resize can repair, which
+// is the owner's sentence word for word.
+//
+// THE RULE NOW:
+//   1. the first solve runs as soon as the probe can be measured — at module
+//      execution when the document is past parsing, at DOMContentLoaded when
+//      it is not. It never waits for `load`.
+//   2. `load` and `resize` are LISTENERS (addEventListener, never
+//      `window.onload = …`, which replaces the host page's own handler), and
+//      they are re-solves that do nothing when nothing has changed.
+//   3. "nothing has changed" is proved, not assumed: same viewport and dpr,
+//      same switch signature, our published CSS still the tag's content, and
+//      the probe still reading what the committed scale implies. A stylesheet
+//      that lands late, a canon a host app rewrote, a Livewire morph that
+//      replaced the style tag or took the probe — every one of them fails one
+//      of those four and gets a real solve.
+//   4. the retry under the re-entrancy guard is unchanged.
+// ---------------------------------------------------------------------------
+
+/* The last COMMITTED solve. `var`, not `let`: it is read from inside
+   simulateScreen(), which is defined far above this line. */
+var sqrSettled = null;
+
+/* Everything a solve's answer depends on that is NOT a custom property.
+   (Custom properties are deliberately excluded, exactly as sqrSolveSignature()
+   excludes them and for the same reason — see its note. The public
+   window.squareRootResolve() is the door for those, and it always forces.) */
+function sqrSolveInputs() {
+    const el = document.documentElement;
+    const h  = (el && el.clientHeight) || window.innerHeight;
+    return window.innerWidth + 'x' + h
+         + '|' + (window.devicePixelRatio || 1)
+         + '|' + (el ? (el.getAttribute(SQR_MAX_COLS_ATTR) || '') : '')
+         + '|' + sqrSolveSignature();
+}
+
+/* Is the ruler still where the settled solve left it? `.sqr-macro-rem` is a
+   rem box, so at the committed root it must read simulatedWidth * root / 16.
+   This is what makes the skip safe rather than merely cheap: a late
+   stylesheet, a host that rewrote --macro-width, or the SCSS landscape swap
+   all change the probe without changing a single input above. */
+function sqrProbeMatchesSettled() {
+    const probe = document.querySelector('.sqr-macro-rem');
+    if (!probe) return false;
+    let rootPx;
+    try { rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize); } catch (e) { return false; }
+    if (!(rootPx > 0)) return false;
+    const expect = sqrSettled.simulatedWidth * rootPx / SQR_REFERENCE_ROOT_PX;
+    return Math.abs(probe.offsetWidth - expect) <= 1;   /* 1px: the browser's own rounding, nothing more */
+}
+
+function sqrSolveIsSettled() {
+    if (!sqrSettled) return false;
+    const tag = document.getElementById('square-root');
+    /* our write is gone (a morph replaced the tag) or somebody else owns it
+       now — either way the page is not wearing this solve any more */
+    if (!tag || tag.innerHTML !== sqrSettled.css) return false;
+    if (sqrSolveInputs() !== sqrSettled.inputs) return false;
+    return sqrProbeMatchesSettled();
+}
+
+/* 1. THE FIRST SOLVE, as early as there is something to measure. */
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { sqrResolveInternal(true); });
+} else {
+    simulateScreen();
+}
+
+/* 2. THE RE-SOLVES. Listeners, so the host page keeps its own handlers. */
+window.addEventListener('resize', sqrResolveOnEvent);
+window.addEventListener('load', sqrResolveOnEvent);
+
+/* 3. ROTATION. Both the modern event and the legacy one, in a try — see the
+   note where the old handler used to be. A rotation is forced: it changes the
+   canon through the stylesheet's landscape swap, which no input can see. */
+try {
+    if (typeof screen !== 'undefined' && screen.orientation && screen.orientation.addEventListener) {
+        screen.orientation.addEventListener('change', function () { sqrResolveInternal(true); });
+    }
+} catch (e) { /* a missing screen.orientation must never cost the observer below */ }
+try {
+    window.addEventListener('orientationchange', function () { sqrResolveInternal(true); });
+} catch (e) { /* ditto */ }

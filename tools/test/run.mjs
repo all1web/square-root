@@ -263,6 +263,120 @@ for (const c of HOST_CASES) {
     ok('…and no style tag is created for it', page.hostStyle() === null);
 }
 
+// ── E. when the solve runs (0.9.2) ─────────────────────────────────────────
+console.log('\nE. when the solve runs — the owner\'s iPad, 2026-09-19');
+
+/* The owner's viewport, with the host app's own ceiling. The numbers are the
+   ones measured on the live page: 1194 / (360 x 3) = 110.55555555555556%,
+   which is 17.68888888888889px of root — and they have to be there by
+   DOMContentLoaded plus one solve, never at `load`. */
+const IPAD = { innerWidth: 1194, innerHeight: 834, dpr: 2, htmlAttrs: { 'data-sqr-max-cols': 'auto' } };
+const IPAD_PCT = '110.55555555555556';
+const IPAD_PX = 17.68888888888889;
+
+{
+    /* the document is past parsing when the module runs (a deferred/module
+       script, which is what a bundler emits): solve immediately. */
+    const page = createPage(Object.assign({}, IPAD, { readyState: 'interactive' }));
+    page.run(NEW_JS);
+    page.flush();
+    ok('readyState=interactive: the first solve lands with no event at all',
+        fontPct(page.rootFontSize()) === IPAD_PCT && page.cols() === '3',
+        page.rootFontSize() + ' cols=' + page.cols());
+    ok('…and the root is 17.69px, not 16px', near(page.rootPx(), IPAD_PX, 1e-9), String(page.rootPx()));
+}
+
+{
+    /* still parsing when the module runs — the probe may not exist yet, so the
+       solve waits for DOMContentLoaded. It must NOT wait for `load`: that was
+       the bug. */
+    const page = createPage(Object.assign({}, IPAD, { readyState: 'loading' }));
+    page.run(NEW_JS);
+    page.flush();
+    ok('readyState=loading: nothing is written at module execution',
+        page.styleWrites().length === 0, JSON.stringify(page.styleWrites()));
+    page.setReadyState('interactive');
+    page.fire('document', 'DOMContentLoaded');
+    page.flush();
+    ok('DOMContentLoaded + one solve: cols=3 AND font-size 110.55555555555556%',
+        fontPct(page.rootFontSize()) === IPAD_PCT && page.cols() === '3',
+        page.rootFontSize() + ' cols=' + page.cols());
+    ok('…the root font-size is 17.69px before `load` has fired at all',
+        near(page.rootPx(), IPAD_PX, 1e-9), String(page.rootPx()));
+
+    /* and `load`, when it finally arrives seconds later, is free */
+    const before = page.styleWrites().length;
+    page.fire('window', 'load');
+    page.flush();
+    ok('`load` after a settled solve writes nothing new',
+        page.styleWrites().length === before, `${page.styleWrites().length - before} extra write(s)`);
+    ok('…and the page never dips to 100% on the way',
+        !page.styleWrites().slice(before).some((s) => /font-size:\s*100%/.test(s)));
+    ok('…and the solve is still the settled one',
+        fontPct(page.rootFontSize()) === IPAD_PCT && page.cols() === '3', page.rootFontSize());
+}
+
+{
+    /* a resize that changes the viewport still solves; one that does not, does
+       not. The first half is the whole framework, so it is worth the line. */
+    const page = createPage(Object.assign({}, IPAD, { readyState: 'complete' }));
+    page.run(NEW_JS);
+    page.flush();
+    const settled = page.styleWrites().length;
+    page.fire('window', 'resize');
+    page.flush();
+    ok('a resize to the same size is a no-op', page.styleWrites().length === settled);
+    page.resize(375, 812);
+    page.fire('window', 'resize');
+    page.flush();
+    ok('a resize to 375x812 re-solves (104.16666666666667%, cols=1)',
+        fontPct(page.rootFontSize()) === '104.16666666666667' && page.cols() === '1',
+        page.rootFontSize() + ' cols=' + page.cols());
+}
+
+{
+    /* the public door is never short-circuited: it is what the README tells a
+       host app to call after changing a CUSTOM PROPERTY, which no input can
+       see. It must re-solve even when everything observable is identical. */
+    const page = createPage(Object.assign({}, IPAD, { readyState: 'complete' }));
+    page.run(NEW_JS);
+    page.flush();
+    const settled = page.styleWrites().length;
+    page.sandbox.window.squareRootResolve();
+    page.flush();
+    ok('window.squareRootResolve() always performs a real solve',
+        page.styleWrites().length > settled, 'it was skipped');
+    ok('…and lands on the same answer', fontPct(page.rootFontSize()) === IPAD_PCT, page.rootFontSize());
+}
+
+{
+    /* THE OWNER'S BUG ITSELF. A rotation landing while a solve is in flight
+       used to write ":root{font-size:100%}" and then drop its own solve, so
+       the page stayed at canon scale until the NEXT rotation — "you have to
+       rotate it back and forth". Here the first solve is deliberately left
+       un-flushed (in flight) when the rotation arrives. */
+    const page = createPage(Object.assign({}, IPAD, { readyState: 'complete' }));
+    page.run(NEW_JS);                       // solve in flight: window.simuating === true
+    ok('a solve is in flight', page.sandbox.window.simuating === true);
+    page.fire('screen', 'change');          // the rotation lands mid-solve
+    page.flush();
+    ok('a rotation mid-solve does not strand the page at 100%',
+        page.rootPx() !== 16 && fontPct(page.rootFontSize()) === IPAD_PCT,
+        page.rootFontSize());
+}
+
+{
+    /* the host page keeps its own handlers */
+    const page = createPage(Object.assign({}, IPAD, { readyState: 'complete' }));
+    page.run(NEW_JS);
+    page.flush();
+    ok('window.onload / window.onresize are never assigned',
+        page.sandbox.window.onload === undefined && page.sandbox.window.onresize === undefined,
+        `onload=${typeof page.sandbox.window.onload} onresize=${typeof page.sandbox.window.onresize}`);
+    ok('resize, load and orientationchange are registered as listeners',
+        ['resize', 'load', 'orientationchange'].every((t) => (page.listeners.window[t] || []).length === 1));
+}
+
 // ── C / D. the stylesheet ──────────────────────────────────────────────────
 console.log('\nC. dist — the solved deck, and additions only');
 

@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.9.2 — 2026-09-19
+
+**The solve happens as soon as there is something to measure.** Owner's report, 04:33 ET:
+*"sometimes the iPad landscape loads the page in 1 column and you have to rotate it back and forth
+for it to fix the root font size … it needs to always happen as soon as possible."* Measured on the
+host app (1194×834): the solve committed 110.55555555555556% at t=3.4s, and then `load` at t=7.0s
+reset the live page to 100% for 510ms before writing the identical answer back. The full finding and
+timeline are in `docs/desktop-side.md` §5.
+
+- **The first solve no longer waits for `load`.** It runs at module execution when
+  `document.readyState !== 'loading'`, and at `DOMContentLoaded` when it is — so a document that was
+  still parsing when this file executed (probe absent, solve cleanly abandoned) is solved at DCL
+  instead of seconds later, or never.
+- **`load` and `resize` are re-solves that do nothing when nothing has changed.** A solve writes
+  `:root{font-size:100%}` into the LIVE page as its measuring baseline and only undoes it ~500ms
+  later; doing that for an answer that cannot move is half a second of the design at canon scale,
+  and any interruption in between leaves it there. "Nothing has changed" is proved on four things —
+  same viewport and dpr, same switch signature, our CSS still the style tag's content, and the probe
+  still reading what the committed scale implies — so a late stylesheet, a canon a host rewrote, or
+  a Livewire morph that replaced the tag or took the probe still gets a real solve.
+  `window.squareRootResolve()` is never short-circuited: it is the documented door for a custom
+  property, which no input can see.
+- **The orientation handler was the iPad bug.** It wrote the 100% baseline itself and then called
+  `simulateScreen()`, which DROPS the call when a solve is in flight — so a rotation landing
+  mid-solve pinned the root at 100% with `data-sqr-cols` still saying 3, and nothing re-queued it
+  until the next rotation. It now goes through the retrying resolver, writes no baseline of its own,
+  and is registered for the legacy `orientationchange` as well — inside a `try`, because
+  `screen.orientation` does not exist on iPadOS before 16.4 and that line threw at module execution,
+  taking the MutationObserver (the live switch for every `data-sqr-*` attribute) down with it.
+- **`addEventListener`, never assignment.** `window.onload = …` and `window.onresize = …` replaced
+  whatever handler the host page had put there. Both are listeners now.
+- Tests: `npm test` grows group E (the owner's viewport, the DCL timeline, the free `load`, the
+  rotation mid-solve, and the two assignments proved gone); the 84 viewport × switch parity against
+  0.8.0's solver is unchanged, digit for digit.
+
+
 ## 0.9.1 — 2026-09-19
 
 **No ceiling, by choice.** Owner's ruling on `docs/desktop-side.md` §4(4): *"With Square Root I
