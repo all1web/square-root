@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.9.0 — 2026-09-19
+
+**The desktop side: a solve that belongs to a pane, not to the window.**
+
+Everything before this release solved `window.innerWidth` and wrote `:root { font-size }`. That is
+right when the window IS the design. It is wrong the moment a shell takes width off the board: at
+1440 behind a 360px sidebar the pane is 1138px, which is three whole macro columns and a 58px ragged
+edge — the exact thing this framework exists to abolish. Three additions, all opt-in, with the
+default path proved identical by test rather than asserted.
+
+### 1. `data-sqr-host` — solve this element
+
+```html
+<div class="page-body" data-sqr-host data-sqr-max-cols="4">…</div>
+```
+
+or `window.squareRootConfigure({ host: '.page-body', maxCols: 4, deckCols: 'solved' })`. The solver
+measures that element's width, runs the same arithmetic the window solve runs, and publishes
+`data-sqr-cols` on the host plus `--micro-width` / `--micro-height` / `--macro-width` /
+`--macro-height` / `--sqr-rem` / `--sqr-scale` through a package-owned
+`<style id="square-root-hosts">`.
+
+It is **not** a `font-size` on the host, and that is the design rather than an omission: every
+utility here is `calc(var(--micro-width) * 0.0625rem * N)` and `rem` is always root-relative, so a
+host font-size would scope nothing. The scope is carried by the numbers —
+`--micro-width = 60 × scale × 16 / rootFontSizePx` renders at exactly `60 × scale` px whatever the
+root is doing. The consequence is the one a shell needs: **`<html>`'s font-size is never touched by a
+host solve**, so a shell's own body type and finger units coexist. A host IS the scope; there is no
+second `--sqr-scope` knob to drift out of step with it.
+
+A `ResizeObserver` per host catches a sidebar collapsing with no window resize. A publish that would
+write the same CSS is skipped, so it settles in one pass and cannot loop.
+
+### 2. `data-sqr-deck-cols="solved"` — decks that follow the solve
+
+Inside a scope carrying it, every `.sqr-span-N` / `.sqr-flow-N` / `.sqr-wide-N` resolves to **S**,
+that scope's `data-sqr-cols`. Authored smaller than the solve: promoted. Authored larger: clamped.
+Phone-authored content spans a desktop pane with no new classes on the markup. The ceiling still
+wins — every rule is guarded with `html:not([data-sqr-max-cols="1"])`.
+
+### 3. Solved gates at 40 / 60 / 80rem
+
+The raw-pixel gates for 3 and 4 have existed since 0.4.0; what was missing was the **solved** case,
+so a pre-solve 1440 painted a `.sqr-span-2` deck two ways and then reflowed. Now it paints four. The
+0.4.0 gate blocks are untouched byte for byte. The gate measures the window while a host measures
+the pane, so server-render `data-sqr-cols` on the host when the shell already knows it.
+
+### Compatibility, and how it is proved
+
+A document with no `data-sqr-host` and no `data-sqr-deck-cols` gets 0.8.0's output digit for digit:
+one `querySelectorAll` that finds nothing, no style tag, no attribute write, no observer.
+`npm test` loads the 0.8.0 solver **out of git** beside this one, drives both through the same
+fake-timer DOM, and compares the published root font-size and `data-sqr-cols` across 84 viewport ×
+switch combinations. The dist diff is additions only, checked as a line subsequence.
+
+New scripts: `npm test`, and `npm run verify` (build → plugin parity → tests).
+
+Design, including the two owner decisions this release deliberately does **not** make — a desktop
+macro unit, and a ceiling above 4: **[docs/desktop-side.md](docs/desktop-side.md)**.
+
+
+
 ## 0.8.0 — 2026-09-10
 
 **Device tiers: how many columns a screen gets can come from its pixels, not just its shape.**

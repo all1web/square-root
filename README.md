@@ -727,6 +727,33 @@ the ceiling still has to be raised for the row to do anything at all.
 
 ---
 
+## The desktop side (`data-sqr-host`, `data-sqr-deck-cols`)
+
+Everything above solves `window.innerWidth`. A desktop shell has chrome, so the board lives in a
+**pane** — and a pane-width solve is the only thing that makes the macro columns tile to the pixel
+instead of leaving a ragged edge.
+
+```html
+<div class="page-body" data-sqr-host data-sqr-max-cols="4" data-sqr-deck-cols="solved">…</div>
+```
+
+```js
+window.squareRootConfigure({ host: '.page-body', maxCols: 4, deckCols: 'solved' });
+```
+
+- **`data-sqr-host`** — solve THIS element. The solver measures its width, publishes `data-sqr-cols`
+  on it, and scopes the finger unit to it by republishing `--micro-width` & co. for that subtree.
+  **`<html>`'s font-size is never touched**, so a shell's own body type and finger units coexist.
+- **`data-sqr-deck-cols="solved"`** — inside that scope, `.sqr-span-N` / `.sqr-flow-N` /
+  `.sqr-wide-N` stop naming a count and follow the scope's solve: promoted when authored smaller,
+  clamped when authored larger. Phone-authored content spans a desktop pane with no new classes.
+
+Both are opt-in; a page with neither behaves exactly as 0.8.0 did, and `npm test` proves it against
+the 0.8.0 solver out of git. Full design, the API table and the two open owner decisions:
+**[docs/desktop-side.md](docs/desktop-side.md)**.
+
+---
+
 ## Known quirks
 
 These are real, they are in the shipped source, and you should know about them before you go debugging your own layout.
@@ -781,6 +808,7 @@ The trailing `()` **invokes** `simulateScreen` immediately and assigns its retur
 - **[docs/UTILITIES.md](docs/UTILITIES.md)** — complete class reference, what each resolves to, and which classes are commented out in source
 - **[docs/INTEGRATION.md](docs/INTEGRATION.md)** — plain HTML, Vite, Laravel/Blade, and coexisting with Tailwind (including the rem-scaling caveat)
 - **[docs/SCROLL-SNAP.md](docs/SCROLL-SNAP.md)** — scroll-snap classes, row overrides, snap-stop behaviour
+- **[docs/desktop-side.md](docs/desktop-side.md)** — the host solve, solved deck columns, the solved gates, and the two owner decisions (a desktop macro unit; a ceiling above 4)
 - Runnable demo: [`examples/index.html`](examples/index.html)
 - Source of truth is small enough to read end to end: [`src/square-root.scss`](src/square-root.scss), [`src/_scrollsnap.scss`](src/_scrollsnap.scss), [`src/square-root.js`](src/square-root.js)
 

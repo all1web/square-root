@@ -939,6 +939,12 @@ function simulateScreen() {
         }
 
         squareRootStyleTag.innerHTML = (" :root { font-size:"+ ratio*100 +"%; } ");
+        /* THE HOST SOLVE (0.9.0). Here and not a line earlier: a host's numbers
+           are divided by the root font-size this write just committed, so the
+           read has to land after it. With no [data-sqr-host] in the document
+           this is one querySelectorAll that finds nothing — no style tag, no
+           attribute write, no observer. See docs/desktop-side.md section 1. */
+        sqrSolveHosts();
         /* THE SOLVE IS COMMITTED. Nothing below may undo it: sqrPrevRootCss is
            cleared so a late failure in the verification read cannot roll the
            page back to the scale it had before this solve. */
@@ -1088,3 +1094,225 @@ new MutationObserver(function() {
        Watching it would make every solve schedule the next one. */
 ] });
 
+
+// ---------------------------------------------------------------------------
+// THE HOST SOLVE — a pane, not the window (0.9.0).
+//
+// The desktop brief's §9.1: "a shell with chrome needs 'solve this PANE into N
+// macro columns'". Everything above solves window.innerWidth and writes
+// :root { font-size }. That is right when the window IS the design. It is
+// wrong the moment a sidebar takes width off the board: at 1440 with Cuba's
+// stock chrome the board gets 1138.2px, which is three whole macro columns and
+// a 58.2px ragged edge — precisely what this framework exists to abolish.
+//
+//   <div data-sqr-host>…</div>                        solve this element
+//   <div data-sqr-host data-sqr-max-cols="4">…</div>  …with its own ceiling
+//   window.squareRootConfigure({ host: '.page-body',  the same, from script
+//                                maxCols: 4,
+//                                deckCols: 'solved' })
+//
+// WHAT IT PUBLISHES, AND WHY IT IS NOT font-size. Every utility in this
+// package is calc(var(--micro-width) * 0.0625rem * N), and `rem` is ALWAYS
+// root-relative — a font-size on the host would not scope a single one of
+// them. So the scope is carried by the NUMBERS instead:
+//
+//     --micro-width(host) = 60 * scale * 16 / rootFontSizePx
+//
+// which renders at exactly 60*scale px whatever the root is doing. Three
+// consequences, all of them the ones §9.6 asked for:
+//   · <html>'s font-size is never touched by a host solve — structurally, not
+//     as a promise. Cuba's 14px body type and our finger units coexist because
+//     they are measured in different things.
+//   · a host IS the scope; there is no second --sqr-scope knob to drift.
+//   · the published values inherit, so every utility inside the pane — and
+//     every app rule written in finger units — follows with no changes.
+// --sqr-rem (the rem the host WOULD have had, in px) is published beside them
+// for type, `em` and host CSS that wants the scope's own ruler.
+//
+// WHERE IT IS PUBLISHED. In a package-owned <style id="square-root-hosts">,
+// one rule per host keyed on data-sqr-host-id — the same shape as the
+// #square-root tag above, and for the same reason: a Livewire morph can strip
+// an inline style attribute for a frame, and a stylesheet rule survives it.
+// data-sqr-cols goes on the host element itself, because that is what the
+// solved-deck rules in square-root.scss read.
+//
+// NO PROBE, NO LANDSCAPE SWAP. The window solve measures .sqr-macro-rem so it
+// survives a host that overrode the canon and a browser with a non-16px
+// default font. A host reads the canon numbers off :root directly — a probe
+// INSIDE the host would read the values the host itself is publishing, which
+// is circular. The landscape swap (361-768px) therefore does not apply inside
+// a host, which is right: a host exists to hold two or more canonical columns.
+//
+// BACKWARDS COMPATIBLE BY CONSTRUCTION. With no [data-sqr-host] in the
+// document the whole feature is one querySelectorAll that finds nothing:
+// sqrHostTag() is never called, so no style tag is created; no attribute is
+// written; no ResizeObserver is constructed. Not one digit of the window solve
+// above depends on anything here.
+// ---------------------------------------------------------------------------
+const SQR_HOST_ATTR      = 'data-sqr-host';
+const SQR_HOST_ID_ATTR   = 'data-sqr-host-id';
+const SQR_HOST_STYLE_ID  = 'square-root-hosts';
+const SQR_DECK_COLS_ATTR = 'data-sqr-deck-cols';
+
+/* The reference root the utilities are authored against: 0.0625rem is 1/16, so
+   a 16px root is the identity. The ONLY place this number is repeated in the
+   host code, mirroring SQR_UNITS_DOWN_FALLBACK's role above. */
+const SQR_REFERENCE_ROOT_PX = 16;
+
+let sqrHostSeq = 0;
+let sqrHostResizeObserver = null;
+let sqrHostCss = null;          // the last CSS published; a no-change publish is skipped
+
+function sqrHostTag() {
+    let tag = document.getElementById(SQR_HOST_STYLE_ID);
+    if (tag) return tag;
+    const head = document.head || document.getElementsByTagName('head')[0];
+    if (!head) return null;
+    tag = document.createElement('style');
+    tag.id = SQR_HOST_STYLE_ID;
+    head.appendChild(tag);
+    return tag;
+}
+
+/* A setting read from the host first, then from <html> — so a page-wide
+   data-sqr-max-cols still governs a host that does not state its own, and a
+   host can always overrule it for its own pane. */
+function sqrHostSetting(el, attr, varName) {
+    let raw = el.getAttribute(attr);
+    if (raw !== null && raw !== '') return raw.trim();
+    return sqrSetting(attr, varName);
+}
+
+function sqrHostMaxCols(el) {
+    const raw = parseFloat(sqrHostSetting(el, SQR_MAX_COLS_ATTR, SQR_MAX_COLS_VAR));
+    return raw > 0 ? raw : SQR_MAX_COLS_DEFAULT;
+}
+
+/* The solve, for one element. Returns null when the element cannot be measured
+   (display:none, not laid out yet) — a host that is not on screen is skipped
+   rather than published at a nonsense scale. */
+function sqrSolveHost(el) {
+    let w = el.clientWidth;
+    if (!(w > 0)) {
+        try { w = el.getBoundingClientRect().width; } catch (e) { w = 0; }
+    }
+    if (!(w > 0)) return null;
+
+    let cs;
+    try { cs = getComputedStyle(document.documentElement); } catch (e) { return null; }
+    const num = function (name, fallback) {
+        const v = parseFloat(cs.getPropertyValue(name));
+        return v > 0 ? v : fallback;
+    };
+    const macroW = num('--macro-width', 360);
+    const macroH = num('--macro-height', 720);
+    const microW = num('--micro-width', 60);
+    const microH = num('--micro-height', 60);
+
+    /* THE SAME ARITHMETIC THE WINDOW SOLVE RUNS, against the pane's width.
+       The 320px floor is the package's own SQR_MIN_COL_PX: a column narrower
+       than that is not a column, here as much as there. */
+    const maxCols = Math.floor(sqrHostMaxCols(el));
+    let cols = 1;
+    if (w >= SQR_MIN_COL_PX * 2) {
+        cols = Math.max(1, Math.min(maxCols, Math.round(w / macroW)));
+        if (w / cols < SQR_MIN_COL_PX) cols = Math.max(1, cols - 1);
+    }
+    const scale = w / (macroW * cols);
+
+    /* rem is root-relative, so the published numbers have to divide out
+       whatever the window solve left on :root. rootPx 16 (no window solve at
+       all, or a solve that landed on 100%) makes this factor exactly 1. */
+    let rootPx = parseFloat(cs.fontSize);
+    if (!(rootPx > 0)) rootPx = SQR_REFERENCE_ROOT_PX;
+    const k = scale * SQR_REFERENCE_ROOT_PX / rootPx;
+
+    return {
+        cols: cols,
+        scale: scale,
+        width: w,
+        decls: '--micro-width:'  + (microW * k) +
+             ';--micro-height:' + (microH * k) +
+             ';--macro-width:'  + (macroW * k) +
+             ';--macro-height:' + (macroH * k) +
+             ';--sqr-rem:'      + (scale * SQR_REFERENCE_ROOT_PX) + 'px' +
+             ';--sqr-scale:'    + scale + ';'
+    };
+}
+
+/* Every host in the document, solved and published in one pass.
+   Called from inside the window solve (right after it commits its font-size)
+   and from the ResizeObserver below. */
+function sqrSolveHosts() {
+    let hosts;
+    try { hosts = document.querySelectorAll('[' + SQR_HOST_ATTR + ']'); } catch (e) { return; }
+    if (!hosts || !hosts.length) return;
+
+    let css = '';
+    for (let i = 0; i < hosts.length; i++) {
+        const el = hosts[i];
+        const solved = sqrSolveHost(el);
+        if (!solved) continue;
+
+        let id = el.getAttribute(SQR_HOST_ID_ATTR);
+        if (!id) {
+            id = String(++sqrHostSeq);
+            el.setAttribute(SQR_HOST_ID_ATTR, id);
+        }
+        /* Guarded, so a host whose solve did not move performs no DOM write —
+           which is also what stops the ResizeObserver below from looping. */
+        const colsStr = String(solved.cols);
+        if (el.getAttribute(SQR_COLS_ATTR) !== colsStr) el.setAttribute(SQR_COLS_ATTR, colsStr);
+
+        css += '[' + SQR_HOST_ID_ATTR + '="' + id + '"]{' + solved.decls + '}\n';
+
+        sqrObserveHost(el);
+    }
+
+    /* Every host was unmeasurable (display:none, not laid out yet). Nothing to
+       say, and saying it would create a style tag for no reason. */
+    if (css === '') return;
+    if (css === sqrHostCss) return;    // nothing moved: no style write either
+    const tag = sqrHostTag();
+    if (!tag) return;
+    tag.innerHTML = css;
+    sqrHostCss = css;
+}
+
+/* A pane can change width with no window resize at all — a sidebar collapses,
+   a rail opens. ResizeObserver is the only thing that sees that. It is
+   constructed lazily, on the first host found, so a document without hosts
+   never builds one; and each element is observed once (the attribute marks it).
+   The loop risk is real and it is closed above: a publish that would write the
+   same CSS is skipped, and nothing this publishes can change the pane's width
+   unless the shell sizes the pane in the pane's own finger units, which is
+   circular by construction and documented as such. */
+const SQR_HOST_OBSERVED_ATTR = 'data-sqr-host-observed';
+function sqrObserveHost(el) {
+    if (typeof ResizeObserver === 'undefined') return;
+    if (el.getAttribute(SQR_HOST_OBSERVED_ATTR) === '1') return;
+    if (!sqrHostResizeObserver) {
+        sqrHostResizeObserver = new ResizeObserver(function () { sqrSolveHosts(); });
+    }
+    el.setAttribute(SQR_HOST_OBSERVED_ATTR, '1');
+    sqrHostResizeObserver.observe(el);
+}
+
+/* The options object the brief asked for, as the one public door. Marking an
+   element is all `host` does — the attribute stays the source of truth, so a
+   server-rendered data-sqr-host and a configured one are the same thing. */
+function squareRootConfigure(opts) {
+    if (!opts) return;
+    if (opts.host) {
+        let els;
+        try { els = document.querySelectorAll(opts.host); } catch (e) { els = []; }
+        for (let i = 0; i < els.length; i++) {
+            els[i].setAttribute(SQR_HOST_ATTR, '');
+            if (opts.maxCols > 0) els[i].setAttribute(SQR_MAX_COLS_ATTR, String(Math.floor(opts.maxCols)));
+            if (opts.deckCols) els[i].setAttribute(SQR_DECK_COLS_ATTR, String(opts.deckCols));
+        }
+    }
+    sqrSolveHosts();
+}
+window.squareRootConfigure = squareRootConfigure;
+window.squareRootSolveHosts = sqrSolveHosts;

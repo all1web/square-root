@@ -36,6 +36,62 @@ for (let i = 1; i <= 8; i++) SCALE[i] = `${i}`;
    Tailwind-only extension for everything else. */
 const HALF = { '1/2': '0.5' };
 
+/* === SOLVED DECK COLUMNS (0.9.0) ======================================
+   Mirrors the `sqr-solved-deck` mixin in src/square-root.scss rule for rule:
+   inside a scope carrying data-sqr-deck-cols="solved", every .sqr-span-N /
+   .sqr-flow-N / .sqr-wide-N resolves to S — the scope's own data-sqr-cols
+   (gate 4), or the widest matching raw-pixel gate before the solver has run
+   (gate 3). Two selector forms per scope, because the scope may be a host
+   element or <html> itself, and the mode class always lives on <html>. */
+const SOLVED = '[data-sqr-deck-cols="solved"]';
+const GUARD = 'html:not([data-sqr-max-cols="1"])';
+
+function solvedDeckBlock(s, at) {
+  const wides = [`${GUARD} ${at}`, `${GUARD}${at}`];
+  const rows = [`${GUARD}.sqr-mode-rows ${at}`, `${GUARD}${at}.sqr-mode-rows`];
+  const flows = [`${GUARD}.sqr-mode-flow ${at}`, `${GUARD}${at}.sqr-mode-flow`];
+  const out = {};
+  for (const p of wides) out[`${p} [class*="sqr-wide-"]`] = { width: unit(6 * s) };
+  for (const p of rows) {
+    out[`${p} [class*="sqr-span-"]`] = {
+      display: 'grid',
+      'grid-template-columns': `repeat(${s}, minmax(0, 1fr))`,
+      'grid-auto-flow': 'row',
+      'column-gap': '0',
+      'align-content': 'start',
+      'padding-inline': unit(0.25),
+    };
+    out[`${p} [class*="sqr-span-"] > .sqr-row`] = { 'grid-column': '1 / -1' };
+    out[`${p} [class*="sqr-span-"] > .sqr-left`] = { 'grid-column': '1' };
+    out[`${p} [class*="sqr-span-"] > .sqr-right`] = { 'grid-column': '2' };
+  }
+  for (const p of flows) {
+    out[`${p} [class*="sqr-flow-"]`] = {
+      display: 'block',
+      'column-count': `${s}`,
+      'column-gap': '0',
+      'column-fill': 'balance',
+      'padding-inline': unit(0.25),
+    };
+    out[`${p} [class*="sqr-flow-"] > *`] = { 'break-inside': 'avoid' };
+    out[`${p} [class*="sqr-flow-"] > .sqr-row`] = { 'column-span': 'all' };
+  }
+  return out;
+}
+
+function solvedDeck() {
+  const out = {};
+  /* GATE 3 — the solved pre-paint, ascending so the widest gate wins. */
+  for (let m = 2; m <= 4; m++) {
+    out[`@media (min-width: ${m * 20}rem)`] = solvedDeckBlock(m, SOLVED);
+  }
+  /* GATE 4 — what the solver solved for this scope. */
+  for (let s = 2; s <= 4; s++) {
+    Object.assign(out, solvedDeckBlock(s, `${SOLVED}[data-sqr-cols="${s}"]`));
+  }
+  return out;
+}
+
 module.exports = plugin(function ({ addBase, addComponents, addUtilities, matchUtilities }) {
 
   /* === :root constants + the ceiling — always emitted ================== */
@@ -53,6 +109,13 @@ module.exports = plugin(function ({ addBase, addComponents, addUtilities, matchU
       display: 'block',
       'column-count': 'initial',
     },
+    /* SOLVED DECK COLUMNS (0.9.0) — the mirror of square-root.scss's
+       sqr-solved-deck mixin, gates 3 and 4. In addBase for the same reason the
+       ceiling above is: these selectors carry no class candidate for JIT to
+       find, so they must be emitted unconditionally. Layer order is moot —
+       every one of them outranks the spanning rules on specificity, which is
+       what the SCSS relies on too. */
+    ...solvedDeck(),
   });
 
   /* === the probes + landscape canon swap =============================== */

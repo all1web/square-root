@@ -1291,6 +1291,494 @@ html[data-sqr-cols="4"].sqr-mode-rows .sqr-span-4 > .sqr-right {
   grid-column: 2;
 }
 
+/* ── SOLVED DECK COLUMNS (0.9.0) ───────────────────────────────────────
+   `.sqr-span-2` names its count, so phone-authored content can never become a
+   four-column deck without new classes. `data-sqr-deck-cols="solved"` on a
+   scope — a host element (square-root.js's host solve) or <html> — stops the
+   count naming a number and starts it naming A DECK:
+
+     Inside a solved scope, every .sqr-span-N / .sqr-flow-N / .sqr-wide-N
+     resolves to S, the data-sqr-cols of THAT scope. Authored smaller than the
+     solve: PROMOTED to it. Authored larger: CLAMPED to it. The authored N
+     selects nothing but the class name — which is why these rules match
+     [class*="sqr-span-"] rather than enumerating N, the same shape the ceiling
+     rule below has used since 0.4.0. It also keeps the block at 48 rules
+     instead of 144.
+
+   THE CEILING STILL WINS. Every selector here is guarded with
+   html:not([data-sqr-max-cols="1"]), because these rules outrank the ceiling
+   rule below on specificity and source order both; the guard means they never
+   match on a page that declared one column, rather than losing a race.
+
+   TWO FORMS PER SCOPE, and they are not the same selector: the scope can be a
+   DESCENDANT of <html> (a host pane) or <html> ITSELF (the whole document in
+   solved mode). The mode class always lives on <html>, so the two forms differ in
+   where .sqr-mode-rows attaches: beside the scope, or beside <html>. */
+/* GATE 3 — THE SOLVED PRE-PAINT (0.9.0). §9.5 of the desktop brief asks for
+   "gates for 3 and 4 so a pre-solve desktop paint is right at 1024/1440". A
+   finding first: the raw-pixel gates for 3 and 4 already exist above (60rem
+   and 80rem) and have honoured .sqr-wide-3 / .sqr-span-4 since 0.4.0. What is
+   actually missing is the SOLVED case — pre-solve, a 1440 desktop paints a
+   .sqr-span-2 deck as two 720px columns and then reflows to four. These are
+   those gates, and the 0.4.0 blocks above are untouched byte for byte.
+
+   Ascending, so the widest matching gate wins by source order, and at a lower
+   specificity than the data-sqr-cols rules below, so the solver's answer
+   replaces the guess the moment it lands. The gate measures the WINDOW while a
+   host measures the PANE, so at 1440 behind a 360px sidebar the gate guesses 4
+   and the solver corrects to 3 — server-render data-sqr-cols on the host when
+   the shell already knows it and there is no reflow at all. */
+@media (min-width: 40rem) {
+  html:not([data-sqr-max-cols="1"]) [data-sqr-deck-cols=solved] [class*=sqr-wide-] {
+    width: calc(var(--micro-width) * 12 * 0.0625rem);
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved] [class*=sqr-wide-] {
+    width: calc(var(--micro-width) * 12 * 0.0625rem);
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved] [class*=sqr-span-] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: row;
+    column-gap: 0;
+    align-content: start;
+    padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved] [class*=sqr-span-] > .sqr-row {
+    grid-column: 1/-1;
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved] [class*=sqr-span-] > .sqr-left {
+    grid-column: 1;
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved] [class*=sqr-span-] > .sqr-right {
+    grid-column: 2;
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-rows [class*=sqr-span-] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: row;
+    column-gap: 0;
+    align-content: start;
+    padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-rows [class*=sqr-span-] > .sqr-row {
+    grid-column: 1/-1;
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-rows [class*=sqr-span-] > .sqr-left {
+    grid-column: 1;
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-rows [class*=sqr-span-] > .sqr-right {
+    grid-column: 2;
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved] [class*=sqr-flow-] {
+    display: block;
+    column-count: 2;
+    column-gap: 0;
+    column-fill: balance;
+    padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved] [class*=sqr-flow-] > * {
+    break-inside: avoid;
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved] [class*=sqr-flow-] > .sqr-row {
+    column-span: all;
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-flow [class*=sqr-flow-] {
+    display: block;
+    column-count: 2;
+    column-gap: 0;
+    column-fill: balance;
+    padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-flow [class*=sqr-flow-] > * {
+    break-inside: avoid;
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-flow [class*=sqr-flow-] > .sqr-row {
+    column-span: all;
+  }
+}
+@media (min-width: 60rem) {
+  html:not([data-sqr-max-cols="1"]) [data-sqr-deck-cols=solved] [class*=sqr-wide-] {
+    width: calc(var(--micro-width) * 18 * 0.0625rem);
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved] [class*=sqr-wide-] {
+    width: calc(var(--micro-width) * 18 * 0.0625rem);
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved] [class*=sqr-span-] {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-flow: row;
+    column-gap: 0;
+    align-content: start;
+    padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved] [class*=sqr-span-] > .sqr-row {
+    grid-column: 1/-1;
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved] [class*=sqr-span-] > .sqr-left {
+    grid-column: 1;
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved] [class*=sqr-span-] > .sqr-right {
+    grid-column: 2;
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-rows [class*=sqr-span-] {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-flow: row;
+    column-gap: 0;
+    align-content: start;
+    padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-rows [class*=sqr-span-] > .sqr-row {
+    grid-column: 1/-1;
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-rows [class*=sqr-span-] > .sqr-left {
+    grid-column: 1;
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-rows [class*=sqr-span-] > .sqr-right {
+    grid-column: 2;
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved] [class*=sqr-flow-] {
+    display: block;
+    column-count: 3;
+    column-gap: 0;
+    column-fill: balance;
+    padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved] [class*=sqr-flow-] > * {
+    break-inside: avoid;
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved] [class*=sqr-flow-] > .sqr-row {
+    column-span: all;
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-flow [class*=sqr-flow-] {
+    display: block;
+    column-count: 3;
+    column-gap: 0;
+    column-fill: balance;
+    padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-flow [class*=sqr-flow-] > * {
+    break-inside: avoid;
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-flow [class*=sqr-flow-] > .sqr-row {
+    column-span: all;
+  }
+}
+@media (min-width: 80rem) {
+  html:not([data-sqr-max-cols="1"]) [data-sqr-deck-cols=solved] [class*=sqr-wide-] {
+    width: calc(var(--micro-width) * 24 * 0.0625rem);
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved] [class*=sqr-wide-] {
+    width: calc(var(--micro-width) * 24 * 0.0625rem);
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved] [class*=sqr-span-] {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-flow: row;
+    column-gap: 0;
+    align-content: start;
+    padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved] [class*=sqr-span-] > .sqr-row {
+    grid-column: 1/-1;
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved] [class*=sqr-span-] > .sqr-left {
+    grid-column: 1;
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved] [class*=sqr-span-] > .sqr-right {
+    grid-column: 2;
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-rows [class*=sqr-span-] {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-flow: row;
+    column-gap: 0;
+    align-content: start;
+    padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-rows [class*=sqr-span-] > .sqr-row {
+    grid-column: 1/-1;
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-rows [class*=sqr-span-] > .sqr-left {
+    grid-column: 1;
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-rows [class*=sqr-span-] > .sqr-right {
+    grid-column: 2;
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved] [class*=sqr-flow-] {
+    display: block;
+    column-count: 4;
+    column-gap: 0;
+    column-fill: balance;
+    padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved] [class*=sqr-flow-] > * {
+    break-inside: avoid;
+  }
+  html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved] [class*=sqr-flow-] > .sqr-row {
+    column-span: all;
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-flow [class*=sqr-flow-] {
+    display: block;
+    column-count: 4;
+    column-gap: 0;
+    column-fill: balance;
+    padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-flow [class*=sqr-flow-] > * {
+    break-inside: avoid;
+  }
+  html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved].sqr-mode-flow [class*=sqr-flow-] > .sqr-row {
+    column-span: all;
+  }
+}
+/* GATE 4 — WHAT THE SOLVER SOLVED FOR THIS SCOPE (0.9.0). */
+html:not([data-sqr-max-cols="1"]) [data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-wide-] {
+  width: calc(var(--micro-width) * 12 * 0.0625rem);
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-wide-] {
+  width: calc(var(--micro-width) * 12 * 0.0625rem);
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-span-] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: row;
+  column-gap: 0;
+  align-content: start;
+  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-span-] > .sqr-row {
+  grid-column: 1/-1;
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-span-] > .sqr-left {
+  grid-column: 1;
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-span-] > .sqr-right {
+  grid-column: 2;
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="2"].sqr-mode-rows [class*=sqr-span-] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: row;
+  column-gap: 0;
+  align-content: start;
+  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="2"].sqr-mode-rows [class*=sqr-span-] > .sqr-row {
+  grid-column: 1/-1;
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="2"].sqr-mode-rows [class*=sqr-span-] > .sqr-left {
+  grid-column: 1;
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="2"].sqr-mode-rows [class*=sqr-span-] > .sqr-right {
+  grid-column: 2;
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-flow-] {
+  display: block;
+  column-count: 2;
+  column-gap: 0;
+  column-fill: balance;
+  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-flow-] > * {
+  break-inside: avoid;
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="2"] [class*=sqr-flow-] > .sqr-row {
+  column-span: all;
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="2"].sqr-mode-flow [class*=sqr-flow-] {
+  display: block;
+  column-count: 2;
+  column-gap: 0;
+  column-fill: balance;
+  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="2"].sqr-mode-flow [class*=sqr-flow-] > * {
+  break-inside: avoid;
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="2"].sqr-mode-flow [class*=sqr-flow-] > .sqr-row {
+  column-span: all;
+}
+
+html:not([data-sqr-max-cols="1"]) [data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-wide-] {
+  width: calc(var(--micro-width) * 18 * 0.0625rem);
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-wide-] {
+  width: calc(var(--micro-width) * 18 * 0.0625rem);
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-span-] {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-flow: row;
+  column-gap: 0;
+  align-content: start;
+  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-span-] > .sqr-row {
+  grid-column: 1/-1;
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-span-] > .sqr-left {
+  grid-column: 1;
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-span-] > .sqr-right {
+  grid-column: 2;
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="3"].sqr-mode-rows [class*=sqr-span-] {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-flow: row;
+  column-gap: 0;
+  align-content: start;
+  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="3"].sqr-mode-rows [class*=sqr-span-] > .sqr-row {
+  grid-column: 1/-1;
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="3"].sqr-mode-rows [class*=sqr-span-] > .sqr-left {
+  grid-column: 1;
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="3"].sqr-mode-rows [class*=sqr-span-] > .sqr-right {
+  grid-column: 2;
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-flow-] {
+  display: block;
+  column-count: 3;
+  column-gap: 0;
+  column-fill: balance;
+  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-flow-] > * {
+  break-inside: avoid;
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="3"] [class*=sqr-flow-] > .sqr-row {
+  column-span: all;
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="3"].sqr-mode-flow [class*=sqr-flow-] {
+  display: block;
+  column-count: 3;
+  column-gap: 0;
+  column-fill: balance;
+  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="3"].sqr-mode-flow [class*=sqr-flow-] > * {
+  break-inside: avoid;
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="3"].sqr-mode-flow [class*=sqr-flow-] > .sqr-row {
+  column-span: all;
+}
+
+html:not([data-sqr-max-cols="1"]) [data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-wide-] {
+  width: calc(var(--micro-width) * 24 * 0.0625rem);
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-wide-] {
+  width: calc(var(--micro-width) * 24 * 0.0625rem);
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-span-] {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-flow: row;
+  column-gap: 0;
+  align-content: start;
+  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-span-] > .sqr-row {
+  grid-column: 1/-1;
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-span-] > .sqr-left {
+  grid-column: 1;
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-rows [data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-span-] > .sqr-right {
+  grid-column: 2;
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="4"].sqr-mode-rows [class*=sqr-span-] {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-flow: row;
+  column-gap: 0;
+  align-content: start;
+  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="4"].sqr-mode-rows [class*=sqr-span-] > .sqr-row {
+  grid-column: 1/-1;
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="4"].sqr-mode-rows [class*=sqr-span-] > .sqr-left {
+  grid-column: 1;
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="4"].sqr-mode-rows [class*=sqr-span-] > .sqr-right {
+  grid-column: 2;
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-flow-] {
+  display: block;
+  column-count: 4;
+  column-gap: 0;
+  column-fill: balance;
+  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-flow-] > * {
+  break-inside: avoid;
+}
+
+html:not([data-sqr-max-cols="1"]).sqr-mode-flow [data-sqr-deck-cols=solved][data-sqr-cols="4"] [class*=sqr-flow-] > .sqr-row {
+  column-span: all;
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="4"].sqr-mode-flow [class*=sqr-flow-] {
+  display: block;
+  column-count: 4;
+  column-gap: 0;
+  column-fill: balance;
+  padding-inline: calc(var(--micro-width) * 0.0625rem * 0.25);
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="4"].sqr-mode-flow [class*=sqr-flow-] > * {
+  break-inside: avoid;
+}
+
+html:not([data-sqr-max-cols="1"])[data-sqr-deck-cols=solved][data-sqr-cols="4"].sqr-mode-flow [class*=sqr-flow-] > .sqr-row {
+  column-span: all;
+}
+
 /* THE CEILING WINS. A page that declares one column never spans. */
 :root[data-sqr-max-cols="1"] [class*=sqr-wide-] {
   width: calc(var(--micro-width) * 6 * 0.0625rem);
